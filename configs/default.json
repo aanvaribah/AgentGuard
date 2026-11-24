@@ -1,0 +1,9 @@
+{
+  "_comment": "Default AgentGuard settings, assuming adop-cyse is cloned into your home directory. Relative paths are resolved against this file's directory and ~ is your home directory. Any command-line flag overrides the value here.",
+  "corpus": "~/adop-cyse/corpus",
+  "agent_root": "~/adop-cyse/testbed-repo",
+  "server_cwd": null,
+  "mirror_root": "../mirror",
+  "model": "qwen2.5:7b",
+  "plain": false
+}

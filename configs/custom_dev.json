@@ -1,0 +1,9 @@
+{
+  "_comment": "I run the dev configs because I'm insanely cool.",
+  "corpus": "/home/lkotlus/Everything/Classes/CYSE/587/adop-cyse/corpus",
+  "agent_root": "/home/lkotlus/Everything/Classes/CYSE/587/adop-cyse/testbed-repo",
+  "server_cwd": null,
+  "mirror_root": "../mirror",
+  "model": "qwen2.5:7b",
+  "plain": false
+}
