@@ -26,13 +26,12 @@ import ollama
 
 from agent_guard.models import AgentView, Finding, ResolvedPath, Status
 from agent_guard.reporting import reporter
+from agent_guard.tokens import FLOW_MIN, strings, tokens, weight
 
 # Literally just magic values (shut up about it)
 EMBED_MODEL = "nomic-embed-text"
-TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9_./:-]{3,}")
 # For when we get a tool instead of a resource ("server:tool" fallback)
 GENERIC_KEY_RE = re.compile(r"^[a-z_]+:[a-z_]+$|^.+ \(.+\)$")
-FLOW_MIN = 3
 MIN_SCORE = 1.0  # relevance floor
 EMBED_TEXT_LIMIT = 2000
 EMBED_WEIGHT = 1.5
@@ -91,21 +90,6 @@ def _view_from_json(s: str) -> AgentView:
     return AgentView(**d)
 
 
-def _strings(obj: Any) -> Iterator[str]:
-    if isinstance(obj, dict):
-        for v in obj.values():
-            yield from _strings(v)
-    elif isinstance(obj, (list, tuple)):
-        for v in obj:
-            yield from _strings(v)
-    elif obj is not None:
-        yield str(obj)
-
-
-def _tokens(text: str) -> set[str]:
-    return set(TOKEN_RE.findall(text.lower()))
-
-
 def _norm(p: str) -> str:
     p = p.strip().replace("\\", "/")
     while p.startswith("./"):
@@ -128,7 +112,7 @@ def _resource_keys(v: AgentView) -> set[str]:
 
 
 def _embed_text(v: AgentView) -> str:
-    args = " ".join(_strings(v.arguments))
+    args = " ".join(strings(v.arguments))
     return f"{v.server}.{v.tool_name} {v.target_resource} {args} {v.result_summary}"[:EMBED_TEXT_LIMIT]
 
 
@@ -193,7 +177,7 @@ class HistoryStore:
             (
                 v.session_id, v.seq, task_key, task_ordinal, _view_to_json(v),
                 json.dumps(sorted(_resource_keys(v))),
-                json.dumps(sorted(_tokens(v.result_summary))),
+                json.dumps(sorted(tokens(v.result_summary))),
                 array("f", emb).tobytes() if emb else None,
             ),
         )
@@ -233,7 +217,7 @@ class HistoryStore:
         task, and embedding similarity within the same task. For earlier
         tasks, just shared resources."""
         cur_keys = _resource_keys(v)
-        cur_tokens = _tokens(" ".join(_strings(v.arguments)))
+        cur_tokens = tokens(" ".join(strings(v.arguments)))
         row = self._db.execute(
             "SELECT embedding FROM calls WHERE session_id = ? AND seq = ?", (v.session_id, v.seq)
         ).fetchone()
@@ -254,7 +238,7 @@ class HistoryStore:
                 continue
 
             score = KEY_MATCH if shared else 0.0
-            flow = len(cur_tokens & set(json.loads(result_tokens)))
+            flow = weight(cur_tokens & set(json.loads(result_tokens)))
             if flow >= FLOW_MIN:
                 score += 1.5 * min(flow / 8, 1.0)
             emb = _unpack(blob)

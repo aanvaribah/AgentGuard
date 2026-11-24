@@ -171,6 +171,9 @@ class Event:
     reasoning: str | None = None
     message: str | None = None
     traceback: str | None = None # used for internal errors
+    provenance: str | None = None
+    provenance_sources: list[int] = field(default_factory=list)
+    provenance_shared: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -185,6 +188,8 @@ class Row:
     evidence: list[int] = field(default_factory=list)
     reasoning: str | None = None
     linked_by: set[int] = field(default_factory=set)
+    provenance: str | None = None
+    provenance_sources: list[int] = field(default_factory=list)
 
 
 @dataclass

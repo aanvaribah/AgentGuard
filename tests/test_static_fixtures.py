@@ -15,6 +15,7 @@ import pytest
 from agent_guard.config import load_file
 from agent_guard.models import LogLine
 from agent_guard.paths import Resolver
+from agent_guard.provenance import ProvenanceTracker
 from agent_guard.scoring import assess
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -70,3 +71,15 @@ def test_expected_result(exp):
     assert a.score == pytest.approx(exp["score"]), why
     if exp["detail_contains"]:
         assert exp["detail_contains"] in "; ".join(a.details), why
+
+
+@pytest.mark.parametrize("path", FIXTURE_FILES, ids=lambda p: p.name)
+def test_provenance(path):
+    """Provenance depends on earlier records, so each file is replayed in seq order."""
+    expected = {e["seq"]: e for e in EXPECTED if e["file"] == path.name}
+    tracker = ProvenanceTracker()
+    for r in _records(path):
+        flag = tracker.observe(LogLine.from_dict(dict(r)))
+        got = None if flag is None else {"kind": flag.kind.value, "sources": list(flag.sources)}
+        exp = expected[r["seq"]]
+        assert got == exp["provenance"], f"{path.name} seq {r['seq']}: {exp['why']}"

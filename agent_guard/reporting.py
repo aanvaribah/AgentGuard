@@ -28,6 +28,7 @@ from rich.text import Text
 
 from agent_guard.agent.prompts import CATEGORIES
 from agent_guard.models import Decision, Event, Incident, Level, LogLine, Row, Snapshot
+from agent_guard.provenance import ProvenanceFlag
 
 
 def _now() -> str:
@@ -50,6 +51,13 @@ def _short(session_id: str, width: int = 14) -> str:
 
 def category_label(category: str | None) -> str:
     return f"{category} {CATEGORIES[category]}" if category in CATEGORIES else "uncategorized"
+
+
+def _provenance_text(kind: str, sources: list[int], shared: list[str]) -> str:
+    seqs = ",".join(map(str, sources))
+    if kind == "derived":
+        return f"derived from seq {seqs} ({_clip(', '.join(shared), 60)})"
+    return f"after untrusted content (seq {seqs})"
 
 
 def verdict_label(r: "Row | Event") -> str:
@@ -81,12 +89,16 @@ class Reporter:
     #
 
     def call(self, log: LogLine, decision: Decision, score: float, *, source: str | None = None,
-             label: str | None = None, evidence=(), reasoning: str | None = None) -> None:
+             label: str | None = None, evidence=(), reasoning: str | None = None,
+             provenance: ProvenanceFlag | None = None) -> None:
         self._emit(Event(
             kind="call", time=_now(), level=Level.CRITICAL if decision in ("alert", "error") else Level.INFO,
             session_id=log.session_id, seq=log.seq, tool=f"{log.server}.{log.tool_name}",
             target=log.target_resource, decision=decision, source=source, score=round(score, 3),
             label=label, evidence=list(evidence), reasoning=reasoning,
+            provenance=provenance.kind.value if provenance else None,
+            provenance_sources=list(provenance.sources) if provenance else [],
+            provenance_shared=list(provenance.shared) if provenance else [],
         ))
 
     def integrity(self, path, message: str) -> None:
@@ -120,7 +132,7 @@ class Reporter:
                 return None
             self._write_failed = True
             return Event(kind="system", time=_now(), level=Level.CRITICAL,
-                         message=f"Event log write failed ({err}). Events are still"
+                         message=f"Event log write failed ({err}). Events are still "
                                  f"shown but not recorded to {self._path}.")
         self._write_failed = False
         return None
@@ -137,8 +149,11 @@ class Reporter:
         self._tick += 1
         self._activity[e.session_id] = self._tick # type: ignore
 
+        # Provenance is decided once, by dispatch, on a call's first event; later verdict
+        # events for the same call don't repeat it, so it is only set here.
         row = rows.get(e.seq) or rows.setdefault(  # type: ignore
-            e.seq, Row(e.seq, e.tool, e.target, e.score, e.decision) # type: ignore
+            e.seq, Row(e.seq, e.tool, e.target, e.score, e.decision,  # type: ignore
+                       provenance=e.provenance, provenance_sources=list(e.provenance_sources))
         )
         row.decision, row.score, row.source, row.label = e.decision, e.score, e.source, e.label # type: ignore
         row.evidence, row.reasoning = e.evidence, e.reasoning
@@ -243,6 +258,8 @@ class PlainView:
             tail = f"score {e.score:.2f}  \"{_clip(e.reasoning or '', 120)}\""
         else:
             tail = f"score {e.score:.2f}  target {_clip(e.target, 60)}"
+        if e.provenance:
+            tail += f"  provenance {_provenance_text(e.provenance, e.provenance_sources, e.provenance_shared)}"
         return f"{head}  {tail}"
 
 
@@ -331,20 +348,22 @@ class LiveView:
         t.add_column("target", ratio=1, min_width=24, no_wrap=True, overflow="ellipsis")
         t.add_column("score", justify="right", no_wrap=True, width=5)
         t.add_column("verdict", no_wrap=True, overflow="ellipsis", max_width=32)
+        t.add_column("provenance", no_wrap=True, overflow="ellipsis", max_width=14)
 
         lines = self._collapse(rows)
         hidden = max(0, len(lines) - self.max_rows)
         if hidden:
-            t.add_row("", Text(f"… {hidden} earlier rows", style="dim"), "", "", "")
+            t.add_row("", Text(f"… {hidden} earlier rows", style="dim"), "", "", "", "")
         for item in lines[hidden:]:
             if isinstance(item, tuple):
                 first, last, n = item
                 t.add_row(Text(f"{first}–{last}", style="dim"), Text(f"{n} suppressed", style="dim"),
-                          "", "", Text("·", style="dim"))
+                          "", "", Text("·", style="dim"), "")
                 continue
             r = item
             style = "red" if r.decision in ("alert", "error") else ("dim" if r.decision == "suppressed" else "")
-            t.add_row(str(r.seq), _clip(r.tool, 26), _clean(r.target), f"{r.score:.2f}", self._verdict(r), style=style)
+            t.add_row(str(r.seq), _clip(r.tool, 26), _clean(r.target), f"{r.score:.2f}", self._verdict(r),
+                      self._provenance(r), style=style)
         return t
 
     @staticmethod
@@ -368,6 +387,14 @@ class LiveView:
                 out.append(r)
         flush()
         return out
+
+    @staticmethod
+    def _provenance(r: Row) -> Text:
+        if r.provenance == "derived":
+            return Text(f"from {', '.join(map(str, r.provenance_sources))}", style="magenta")
+        if r.provenance == "context":
+            return Text("after untrusted", style="dim magenta")
+        return Text("")
 
     @staticmethod
     def _verdict(r: Row) -> Text:
