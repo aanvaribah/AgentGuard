@@ -36,8 +36,8 @@ class Resolver:
     def resolve(self, log: LogLine) -> tuple[ResolvedPath, ...]:
         base = self.base(log.server, log.tool_name)
         found = [(a, str(log.arguments[a])) for a in PATH_ARGS if a in log.arguments]
-        if (log.server, log.tool_name) == ("git", "git_diff"):
-            found += [("pathspec", t) for t in _tokens(log.arguments.get("pathspec", "")) if not t.startswith("-")]
+        if (log.server, log.tool_name) == ("git", "git_init"):
+            found = [(a, raw) for a, raw in found if not raw.startswith("-")]
         return tuple(self._one(arg, raw, base) for arg, raw in found)
 
     def _one(self, arg: str, raw: str, base: Path) -> ResolvedPath:
