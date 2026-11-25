@@ -10,6 +10,7 @@ from pathlib import Path
 
 from watchdog.observers import Observer
 
+from agent_guard import demo
 from agent_guard.analyst.models import ModelInfo, inspect
 from agent_guard.analyst.registry import registry
 from agent_guard.config import EMBED_MODEL, ConfigError, resolve
@@ -18,6 +19,8 @@ from agent_guard.report.html import write_reports
 from agent_guard.report.live import LiveView
 from agent_guard.report.plain import PlainView
 from agent_guard.report.reporter import LibraryLogHandler, reporter
+
+DEMO_INTERVAL = 10.0  # seconds between records in --demo
 
 BANNER = r"""
     _                    _    ____                     _
@@ -107,12 +110,30 @@ def main() -> None:
         help="Disable the TUI (--no-plain forces it on, overriding the config).",
     )
     parser.add_argument(
-        "--report",
-        type=Path,
+        "--demo",
+        type=float,
+        nargs="?",
+        const=DEMO_INTERVAL,
         default=None,
-        help="Write an HTML report of the run here on exit.",
+        metavar="SECONDS",
+        help="Demo mode: replay a scripted ADOP session into a temporary workspace, one record "
+        f"every SECONDS (default {DEMO_INTERVAL:g}). Overrides --path, --agent-root and --server-cwd.",
     )
     args = parser.parse_args()
+
+    interval: float | None = args.demo
+    workspace = None
+    if interval is not None:
+        if interval <= 0:
+            parser.error("--demo needs a positive number of seconds")
+        try:
+            workspace = demo.prepare()
+            demo.load_script()
+        except OSError as e:
+            parser.error(f"--demo: {e}")
+        args.path, args.agent_root = str(workspace.corpus), str(workspace.agent_root)
+        args.server_cwd = str(workspace.server_cwd)
+        args.mirror_root = args.mirror_root or str(workspace.mirror)
 
     try:
         cfg = resolve(
@@ -163,9 +184,15 @@ def main() -> None:
     observer = Observer()
     observer.schedule(event_handler, str(cfg.corpus), recursive=True)
 
+    feeder = demo.Feeder(cfg.corpus, interval) if interval is not None else None
+
     with view:
         event_handler.resume()
         observer.start()
+        if feeder:
+            reporter.info(f"Demo: {len(feeder.records)} records, one every {feeder.interval:g}s, "
+                          f"written to {cfg.corpus}")
+            feeder.start()
         try:
             while observer.is_alive():
                 time.sleep(1)
@@ -173,6 +200,8 @@ def main() -> None:
         except KeyboardInterrupt:
             pass
         finally:
+            if feeder:
+                feeder.stop.set()
             observer.stop()
 
     observer.join()
@@ -184,6 +213,8 @@ def main() -> None:
         print(f"Reports written to {reports / 'index.html'}")
     except OSError as e:
         print(f"Can't write the reports: {e}", file=sys.stderr)
+    if workspace:
+        print(f"Demo files kept in {workspace.root}")
 
 
 if __name__ == "__main__":

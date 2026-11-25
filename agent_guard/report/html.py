@@ -16,8 +16,6 @@ from datetime import datetime
 from pathlib import Path
 
 from agent_guard.core.events import Event, Level, Row, Snapshot
-from agent_guard.core.taxonomy import CATEGORIES
-from agent_guard.detect.scoring import ALERT_THRESH, REVIEW_THRESH
 from agent_guard.report.reporter import Reporter
 from agent_guard.report.text import clean, provenance_text, verdict_label
 from agent_guard.triage.incidents import Incident, ranked

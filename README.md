@@ -99,6 +99,7 @@ python main.py [-c CONFIG] [-p PATH] [-a AGENT_ROOT] [-s SERVER_CWD]
 | `-m`, `--mirror-root` | `mirror_root` | Where mirrors, the event log, the history database and reports go | `mirror/` in the AgentGuard directory |
 | `--model` | `model` | Ollama model for the analyst (only `qwen2.5:7b` is pinned) | `qwen2.5:7b` |
 | `--plain` / `--no-plain` | `plain` | Plain line output instead of the TUI | off (plain is always used when stdout is not a terminal) |
+| `--demo [SECONDS]` | | Demo mode: replay a scripted session into a temporary workspace, one record every SECONDS | off; 10 seconds when given without a value |
 
 ### Configuration
 
@@ -156,6 +157,15 @@ Save the plain output to a file. Plain mode is used automatically when output is
 python main.py > agentguard.log
 ```
 
+Show AgentGuard working without ADOP. A scripted corpus (ADOP's reference session, then a second session with poisoned memory, a planted git hook, a forged data tag and a `--template` injection) is written into a temporary workspace one record at a time:
+
+```bash
+python main.py --demo          # one record every 10 seconds
+python main.py --demo 3        # faster
+```
+
+Press Ctrl-C when the demo says it has finished; the reports are written as usual, and the demo files are kept in the temporary directory AgentGuard prints.
+
 ### Live and existing logs
 
 AgentGuard has no separate static mode. At startup it reads every `*.jsonl` file under the corpus, then keeps watching for new lines until you press Ctrl-C. Analyzing a finished corpus and monitoring a live one are the same run; a finished corpus simply never grows.
@@ -202,6 +212,8 @@ python -m agent_guard.report.html mirror/agentguard-events.jsonl          # writ
 ```
 
 Calls still waiting for the analyst when AgentGuard exits are shown as "still reviewing".
+
+![Reported incidents](media/images/report.png)
 
 ### Files in the mirror directory
 

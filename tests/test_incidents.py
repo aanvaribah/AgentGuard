@@ -15,7 +15,7 @@ def row(
         "tool.x",
         f"target-{seq}",
         0.3,
-        decision,
+        decision, # type: ignore
         source=source,
         evidence=list(evidence),  # type: ignore
         impact=impact,
