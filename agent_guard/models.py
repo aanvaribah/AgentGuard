@@ -177,6 +177,8 @@ class Event:
     impact: float | None = None
     impact_vector: str | None = None
     impact_basis: str | None = None
+    caused_by: list[int] = field(default_factory=list)
+    caused_by_reasons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -195,6 +197,8 @@ class Row:
     provenance_sources: list[int] = field(default_factory=list)
     impact: float | None = None
     impact_vector: str | None = None
+    caused_by: list[int] = field(default_factory=list)
+    first_seen: str = ""
 
 
 @dataclass
@@ -203,10 +207,16 @@ class Snapshot:
     order: list[str]    # session ids in decending order of recency
     integrity: list[Event]
     notices: list[Event]
+    order: list[str]
 
 
 @dataclass(frozen=True)
 class Incident:
-    seq: int
-    chain: list[int]
+    """Causally linked calls containing at least one alert, rooted at the earliest."""
+    root: int
+    members: list[int]
+    alerts: list[int]
+    top: int
+    impact: float | None
+    first_seen: str
     cites: list[int]

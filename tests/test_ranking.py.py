@@ -53,18 +53,17 @@ def test_analyst_impact(tool, category, vector):
 
 
 def test_rank_order():
-    # (impact, provenance, source, seq) -> expected position
-    alerts = {
-        "low impact":                (4.0, None, "signature", 30),
-        "highest impact":            (5.8, None, "analyst", 10),
-        "tie, derived":              (4.7, "derived", "analyst", 20),
-        "tie, signature":            (4.7, None, "signature", 21),
-        "tie, analyst, newer":       (4.7, None, "analyst", 25),
-        "tie, analyst, older":       (4.7, None, "analyst", 22),
-        "unrated":                   (None, None, None, 40),
+    # (chain impact, number of alerts, root first seen, root seq)
+    incidents = {
+        "highest impact":            (5.8, 1, "2026-11-24T12:00:30", 30),
+        "tie, more alerts":          (4.7, 3, "2026-11-24T12:00:40", 40),
+        "tie, earliest root":        (4.7, 1, "2026-11-24T12:00:10", 10),
+        "tie, later root":           (4.7, 1, "2026-11-24T12:00:20", 20),
+        "lower impact, many alerts": (4.0, 9, "2026-11-24T12:00:01", 1),
+        "unrated":                   (None, 1, "2026-11-24T12:00:00", 0),
     }
-    order = sorted(alerts, key=lambda k: rank_key(*alerts[k]))
+    order = sorted(incidents, key=lambda k: rank_key(*incidents[k]))
     assert order == [
-        "highest impact", "tie, derived", "tie, signature",
-        "tie, analyst, newer", "tie, analyst, older", "low impact", "unrated",
+        "highest impact", "tie, more alerts", "tie, earliest root", "tie, later root",
+        "lower impact, many alerts", "unrated",
     ]

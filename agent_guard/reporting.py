@@ -27,6 +27,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agent_guard.agent.prompts import CATEGORIES
+from agent_guard.causality import NO_LINKS, Links
 from agent_guard.models import Decision, Event, Incident, Level, LogLine, Row, Snapshot
 from agent_guard.provenance import ProvenanceFlag
 from agent_guard.ranking import Impact, rank_key
@@ -91,7 +92,8 @@ class Reporter:
 
     def call(self, log: LogLine, decision: Decision, score: float, *, source: str | None = None,
              label: str | None = None, evidence=(), reasoning: str | None = None,
-             provenance: ProvenanceFlag | None = None, impact: Impact | None = None) -> None:
+             provenance: ProvenanceFlag | None = None, impact: Impact | None = None,
+             caused_by: Links = NO_LINKS) -> None:
         self._emit(Event(
             kind="call", time=_now(), level=Level.CRITICAL if decision in ("alert", "error") else Level.INFO,
             session_id=log.session_id, seq=log.seq, tool=f"{log.server}.{log.tool_name}",
@@ -103,6 +105,8 @@ class Reporter:
             impact=round(impact.score, 3) if impact else None,
             impact_vector=impact.vector if impact else None,
             impact_basis=impact.basis if impact else None,
+            caused_by=list(caused_by.parents),
+            caused_by_reasons=list(caused_by.reasons),
         ))
 
     def integrity(self, path, message: str) -> None:
@@ -153,11 +157,13 @@ class Reporter:
         self._tick += 1
         self._activity[e.session_id] = self._tick # type: ignore
 
-        # Provenance is decided once, by dispatch, on a call's first event; later verdict
-        # events for the same call don't repeat it, so it is only set here.
+        # Provenance and causal links are decided once, by dispatch, on a call's first
+        # event; later verdict events for the same call don't repeat them, so they are
+        # only set here.
         row = rows.get(e.seq) or rows.setdefault(  # type: ignore
             e.seq, Row(e.seq, e.tool, e.target, e.score, e.decision,  # type: ignore
-                       provenance=e.provenance, provenance_sources=list(e.provenance_sources))
+                       provenance=e.provenance, provenance_sources=list(e.provenance_sources),
+                       caused_by=list(e.caused_by), first_seen=e.time)
         )
         row.decision, row.score, row.source, row.label = e.decision, e.score, e.source, e.label # type: ignore
         row.evidence, row.reasoning = e.evidence, e.reasoning
@@ -209,14 +215,15 @@ class LibraryLogHandler(logging.Handler):
 
 
 def ranked(snap: Snapshot) -> list[tuple[str, Incident]]:
-    """Every incident across sessions, highest impact first (see ranking.rank_key)."""
+    """Every incident across sessions, highest priority first (see ranking.rank_key)."""
     found = [(sid, inc) for sid in snap.order for inc in incidents(snap.sessions[sid])]
+    return sorted(found, key=lambda item: rank_key(
+        item[1].impact, len(item[1].alerts), item[1].first_seen, item[1].root))
 
-    def key(item: tuple[str, Incident]) -> tuple:
-        r = snap.sessions[item[0]][item[1].seq]
-        return rank_key(r.impact, r.provenance, r.source, r.seq)
 
-    return sorted(found, key=key)
+def _members_text(inc: Incident, arrow: str) -> str:
+    rest = [s for s in inc.members if s != inc.root]
+    return f"seq {inc.root}" + (f" {arrow} {', '.join(map(str, rest))}" if rest else "")
 
 
 def _impact_text(score: float | None, vector: str | None) -> str:
@@ -224,14 +231,40 @@ def _impact_text(score: float | None, vector: str | None) -> str:
 
 
 def incidents(rows: dict[int, Row]) -> list[Incident]:
+    """Groups calls linked by causal edges (content flow and resource reuse; see
+    causality.py) and keeps the groups that contain an alert. The analyst's cited
+    evidence never joins groups; alerts it points to are listed as citations."""
+    parent: dict[int, int] = {}
+
+    def find(x: int) -> int:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for r in rows.values():
+        find(r.seq)
+        for p in r.caused_by:
+            if p in rows:
+                parent[find(r.seq)] = find(p)
+
+    groups: dict[int, list[int]] = {}
+    for s in rows:
+        groups.setdefault(find(s), []).append(s)
+
     out = []
-    for r in sorted(rows.values(), key=lambda r: r.seq):
-        if r.decision not in ("alert", "error"):
+    for members in groups.values():
+        members.sort()
+        alerts = [s for s in members if rows[s].decision in ("alert", "error")]
+        if not alerts:
             continue
-        cited = [s for s in r.evidence if s != r.seq and s in rows]
-        cites = sorted(s for s in cited if rows[s].decision in ("alert", "error"))
-        chain = sorted({r.seq, *(s for s in cited if s not in cites)})
-        out.append(Incident(r.seq, chain, cites))
+        top = min(alerts, key=lambda s: (-(rows[s].impact or 0.0), s))
+        inside = set(members)
+        cites = sorted({e for s in alerts for e in rows[s].evidence
+                        if e in rows and e not in inside and rows[e].decision in ("alert", "error")})
+        root = members[0]
+        out.append(Incident(root, members, alerts, top, rows[top].impact, rows[root].first_seen, cites))
     return out
 
 
@@ -241,7 +274,7 @@ def incidents(rows: dict[int, Row]) -> list[Incident]:
 
 
 class PlainView:
-    """One line per event and fixed columns, then the ranked alerts on exit."""
+    """One line per event and fixed columns, then the ranked incidents on exit."""
     def __init__(self, source: "Reporter | None" = None):
         self.source = source
         self._closed = False
@@ -260,12 +293,15 @@ class PlainView:
     @staticmethod
     def summary(snap: Snapshot) -> str:
         found = ranked(snap)
-        lines = ["", f"Ranked alerts ({len(found)})"]
+        lines = ["", f"Ranked incidents ({len(found)})"]
         for n, (sid, inc) in enumerate(found, start=1):
-            r = snap.sessions[sid][inc.seq]
-            chain = " -> ".join(map(str, inc.chain))
-            lines.append(f"{n:>3}. {_impact_text(r.impact, r.impact_vector):<30}  {_short(sid):<14}  "
-                         f"seq {chain:<16}  {verdict_label(r)}")
+            rows = snap.sessions[sid]
+            top, root = rows[inc.top], rows[inc.root]
+            count = f" ({len(inc.alerts)} alerts)" if len(inc.alerts) > 1 else ""
+            lines.append(f"{n:>3}. {_impact_text(top.impact, top.impact_vector):<30}  {_short(sid):<14}  "
+                         f"{_members_text(inc, '->'):<20}  {verdict_label(top)}{count}")
+            if inc.root != inc.top:
+                lines.append(f"{'':<5}root cause: seq {root.seq} {root.tool} {_clip(root.target, 60)}")
         for e in snap.integrity:
             lines.append(f"     TAMPER  {_clean(e.target)}: {_clean(e.message)}")
         return "\n".join(lines)
@@ -301,6 +337,8 @@ class PlainView:
             tail = f"score {e.score:.2f}  target {_clip(e.target, 60)}"
         if e.provenance:
             tail += f"  provenance {_provenance_text(e.provenance, e.provenance_sources, e.provenance_shared)}"
+        if e.caused_by:
+            tail += f"  caused by seq {','.join(map(str, e.caused_by))}"
         return f"{head}  {tail}"
 
 
@@ -359,19 +397,23 @@ class LiveView:
         shown = found[:self.max_incidents]  # highest impact first
 
         for n, (sid, inc) in enumerate(shown, start=1):
-            r = snap.sessions[sid][inc.seq]
-            chain_text = " → ".join(map(str, inc.chain))
+            rows = snap.sessions[sid]
+            r, root = rows[inc.top], rows[inc.root]
             impact = f"{r.impact:.1f}" if r.impact is not None else " n/a"
             line = Text.assemble(
                 (f"{n:>2}. ", "bold"), (f"{impact:>4} ", "bold red"), (f"{r.impact_vector or '':<20} ", "red"),
-                (f"{_short(sid)}  ", "dim"), (f"seq {chain_text}", "bold"), "   ", (verdict_label(r), "red"),
+                (f"{_short(sid)}  ", "dim"), (_members_text(inc, "→"), "bold"), "   ", (verdict_label(r), "red"),
             )
+            if len(inc.alerts) > 1:
+                line.append(f"   {len(inc.alerts)} alerts", style="red")
             if inc.cites:
                 line.append(f"   cites {', '.join(map(str, inc.cites))}", style="dim red")
             grid.add_row(line)
 
+            if inc.root != inc.top:
+                grid.add_row(Text(f"    root cause: seq {root.seq} {root.tool} → {_clip(root.target, 60)}", style="dim"))
             detail = _clip(r.reasoning, 100) if r.reasoning else f"→ {_clip(r.target, 70)}"
-            grid.add_row(Text(f"    {r.tool}: {detail}", style="dim"))
+            grid.add_row(Text(f"    seq {r.seq} {r.tool}: {detail}", style="dim"))
 
         if len(found) > len(shown):
             grid.add_row(Text(f"… {len(found) - len(shown)} lower-ranked incidents", style="dim"))
@@ -379,7 +421,7 @@ class LiveView:
         alerting = bool(snap.integrity or found)
         return Panel(
             grid if alerting else Text("No alerts", style="green"),
-            title="Alerts, ranked by CVSS v3.1 impact", title_align="left", box=box.SQUARE,
+            title="Incidents, ranked by chain impact (CVSS v3.1)", title_align="left", box=box.SQUARE,
             border_style="red" if alerting else "green",
         )
 

@@ -12,7 +12,6 @@ SQLite I love SQLite I love SQLite ...)
 import hashlib
 import json
 import math
-import re
 import sqlite3
 from array import array
 from collections.abc import Iterator
@@ -24,6 +23,7 @@ from typing import Any
 import httpx
 import ollama
 
+from agent_guard.causality import resource_keys
 from agent_guard.models import AgentView, Finding, ResolvedPath, Status
 from agent_guard.reporting import reporter
 from agent_guard.tokens import FLOW_MIN, strings, tokens, weight
@@ -31,7 +31,6 @@ from agent_guard.tokens import FLOW_MIN, strings, tokens, weight
 # Literally just magic values (shut up about it)
 EMBED_MODEL = "nomic-embed-text"
 # For when we get a tool instead of a resource ("server:tool" fallback)
-GENERIC_KEY_RE = re.compile(r"^[a-z_]+:[a-z_]+$|^.+ \(.+\)$")
 MIN_SCORE = 1.0  # relevance floor
 EMBED_TEXT_LIMIT = 2000
 EMBED_WEIGHT = 1.5
@@ -88,27 +87,6 @@ def _view_from_json(s: str) -> AgentView:
     d["timestamp"] = datetime.fromisoformat(d["timestamp"])
     d["resolved_paths"] = tuple(ResolvedPath(**r) for r in d.get("resolved_paths", ()))
     return AgentView(**d)
-
-
-def _norm(p: str) -> str:
-    p = p.strip().replace("\\", "/")
-    while p.startswith("./"):
-        p = p[2:]
-    return p.rstrip("/") or "."
-
-
-def _resource_keys(v: AgentView) -> set[str]:
-    """Identifiers for what a call touched: paths, URLs, memory keys."""
-    args = v.arguments
-    if v.resolved_paths:
-        keys = {r.resolved for r in v.resolved_paths if r.resolved is not None}
-    else:
-        keys = {_norm(v.target_resource)}
-    if "url" in args:
-        keys.add(_norm(str(args["url"])))
-    if "namespace" in args and "key" in args:
-        keys.add(f"memory://{args['namespace']}/{args['key']}")
-    return {k for k in keys if k != "." and not GENERIC_KEY_RE.match(k)}
 
 
 def _embed_text(v: AgentView) -> str:

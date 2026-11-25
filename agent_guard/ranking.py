@@ -13,8 +13,10 @@ This is the CVSS Impact subscore applied to an observed action, not a full CVSS 
 exploitability is not scored, since the call already happened. Scores are compared
 unrounded and shown to one decimal, as NVD shows Impact subscores.
 
-Ties are broken by provenance (content derived from an untrusted source first), then
-signature before analyst, then the most recent call.
+Incidents (causally linked calls, see causality.py) are ranked by chain impact, the
+highest impact of any alert in the incident, attributed to its root cause, as the CVSS
+v3.1 User Guide scores a chain by its most impactful link. Ties go to the incident with
+more alerts (blast radius), then to the earliest root.
 """
 
 from dataclasses import dataclass
@@ -136,8 +138,7 @@ def analyst_impact(log: LogLine, category: str | None) -> Impact:
     return combine(base, CATEGORY[category]) if category in CATEGORY else base
 
 
-def rank_key(impact: float | None, provenance: str | None, source: str | None, seq: int) -> tuple:
-    """Sort key, highest priority first."""
-    prov = {"derived": 0, "context": 1}.get(provenance or "", 2)
-    src = {"signature": 0, "analyst": 1}.get(source or "", 2)
-    return (-(impact or 0.0), prov, src, -seq)
+def rank_key(impact: float | None, alerts: int, first_seen: str, root: int) -> tuple:
+    """Incident sort key, highest priority first: chain impact, then number of alerts,
+    then the earliest root (by time, then seq)."""
+    return (-(impact or 0.0), -alerts, first_seen, root)
