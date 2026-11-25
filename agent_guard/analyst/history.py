@@ -22,10 +22,11 @@ from typing import Any
 import httpx
 import ollama
 
-from agent_guard.causality import resource_keys
-from agent_guard.models import AgentView, Finding, ResolvedPath, Status
-from agent_guard.reporting import reporter
-from agent_guard.tokens import FLOW_MIN, strings, tokens, weight
+from agent_guard.analyst.view import AgentView, Finding
+from agent_guard.core.records import ResolvedPath, Status
+from agent_guard.lineage.causality import resource_keys
+from agent_guard.lineage.tokens import FLOW_MIN, strings, tokens, weight
+from agent_guard.report.reporter import reporter
 
 # Literally just magic values (shut up about it)
 EMBED_MODEL = "nomic-embed-text"

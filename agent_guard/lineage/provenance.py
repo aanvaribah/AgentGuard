@@ -23,8 +23,9 @@ more), so content from later in a long page cannot be traced.
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from agent_guard.models import LOW_RISK_TOOLS, LogLine, Status
-from agent_guard.tokens import flowed, strings, tokens
+from agent_guard.core.records import LogLine, Status
+from agent_guard.detect.priors import LOW_RISK_TOOLS
+from agent_guard.lineage.tokens import flowed, strings, tokens
 
 UNTRUSTED_SOURCES = frozenset({("fetch", "fetch"), ("memory", "memory_get")})
 MAX_SOURCES = 20        # untrusted results remembered per task instance

@@ -1,17 +1,18 @@
 """
 This is where the magic happens. Signature-based results
 get dispatched to agents, which then further evaluate based on
-other evidence. Scoring itself lives in scoring.py.
+other evidence. Scoring itself lives in detect/scoring.py.
 """
 
-from agent_guard.causality import CausalTracker
-from agent_guard.models import AgentView, LogLine
-from agent_guard.paths import Resolver
-from agent_guard.provenance import ProvenanceTracker
-from agent_guard.ranking import signature_impact
-from agent_guard.registry import registry
-from agent_guard.reporting import reporter
-from agent_guard.scoring import assess
+from agent_guard.analyst.registry import registry
+from agent_guard.analyst.view import AgentView
+from agent_guard.core.records import LogLine
+from agent_guard.detect.paths import Resolver
+from agent_guard.detect.scoring import assess
+from agent_guard.lineage.causality import CausalTracker
+from agent_guard.lineage.provenance import ProvenanceTracker
+from agent_guard.report.reporter import reporter
+from agent_guard.triage.impact import signature_impact
 
 # Records arrive here in seq order per session (resume() replays files before the
 # observer starts, then watchdog delivers appends on one thread), as the tracker needs.

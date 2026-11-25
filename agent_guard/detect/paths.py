@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from agent_guard.models import LogLine, ResolvedPath
+from agent_guard.core.records import LogLine, ResolvedPath
 
 PATH_ARGS = ("target_path", "path")
 

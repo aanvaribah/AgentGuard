@@ -13,16 +13,15 @@ This is the CVSS Impact subscore applied to an observed action, not a full CVSS 
 exploitability is not scored, since the call already happened. Scores are compared
 unrounded and shown to one decimal, as NVD shows Impact subscores.
 
-Incidents (causally linked calls, see causality.py) are ranked by chain impact, the
-highest impact of any alert in the incident, attributed to its root cause, as the CVSS
-v3.1 User Guide scores a chain by its most impactful link. Ties go to the incident with
-more alerts (blast radius), then to the earliest root.
+Incidents take the highest impact of any of their alerts; see triage/incidents.py.
 """
 
 from dataclasses import dataclass
 
-from agent_guard.models import LOW_RISK_TOOLS, LogLine
-from agent_guard.scoring import Assessment, injected_option
+from agent_guard.core.records import LogLine
+from agent_guard.detect.priors import LOW_RISK_TOOLS
+from agent_guard.detect.scoring import Assessment
+from agent_guard.detect.signatures import injected_option
 
 WEIGHT = {"N": 0.0, "L": 0.22, "H": 0.56}   # CVSS v3.1 C/I/A weights
 ORDER = "NLH"

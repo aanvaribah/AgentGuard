@@ -14,10 +14,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agent_guard.agent.agent import DEFAULT_MODEL
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "default.json"
+DEFAULT_MODEL = "qwen2.5:7b"  # Ollama model for the analyst
 
 # key -> (kind, built-in default). "path?" may be null; for mirror_root, null means
 # "use a fresh temporary directory", which keeps repeated test runs independent.

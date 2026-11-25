@@ -9,13 +9,14 @@ from typing import Literal
 import ollama
 from pydantic import BaseModel, Field, ValidationError
 
-from agent_guard.agent.history import HistoryStore
-from agent_guard.agent.prompts import SYSTEM_PROMPT, build_review
-from agent_guard.models import AgentView, Confidences, Finding
-from agent_guard.paths import describe
+from agent_guard.analyst.history import HistoryStore
+from agent_guard.analyst.prompts import SYSTEM_PROMPT, build_review
+from agent_guard.analyst.view import AgentView, Finding
+from agent_guard.config import DEFAULT_MODEL
+from agent_guard.detect.paths import describe
+from agent_guard.detect.scoring import Confidences
 
 # These are magic, I wouldn't worry about it
-DEFAULT_MODEL = "qwen2.5:7b"
 RECENT_WINDOW = 6
 RELATED_K = 6
 MAX_FINDINGS = 20

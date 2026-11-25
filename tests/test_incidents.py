@@ -3,8 +3,8 @@ Incident grouping and ranking: causal links join calls into incidents rooted at 
 earliest call; chain impact, then alert count, then the earliest root decide the order.
 """
 
-from agent_guard.models import Row, Snapshot
-from agent_guard.reporting import incidents, ranked
+from agent_guard.core.events import Row, Snapshot
+from agent_guard.triage.incidents import incidents, ranked
 
 
 def row(seq, decision="suppressed", *, impact=None, caused_by=(), evidence=(), source=None):

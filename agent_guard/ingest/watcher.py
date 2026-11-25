@@ -4,6 +4,7 @@ AgentGuard Event Handler
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from watchdog.events import (
@@ -14,14 +15,23 @@ from watchdog.events import (
     FileSystemEventHandler,
 )
 
-from agent_guard.dispatch import dispatch_finding
-from agent_guard.models import LogLine, TrackedFile
-from agent_guard.paths import Resolver
-from agent_guard.reporting import reporter
+from agent_guard.core.records import LogLine
+from agent_guard.detect.paths import Resolver
+from agent_guard.pipeline import dispatch_finding
+from agent_guard.report.reporter import reporter
 
 LOG_SUFFIX = ".jsonl"
 CHUNK = 1 << 16
 NONCONFORMING = (json.JSONDecodeError, TypeError, KeyError, ValueError)
+
+
+@dataclass
+class TrackedFile:
+    mirror: Path
+    offset: int = 0
+    tail_start: int = 0
+    tail: bytes = b""
+
 
 def _end_of_last_line(f, size: int) -> int:
     """Offset just past the last newline in an open binary file of `size` bytes."""

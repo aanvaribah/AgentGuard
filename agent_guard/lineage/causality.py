@@ -5,7 +5,7 @@ Two kinds of edge, both deterministic (the analyst's cited evidence is shown, bu
 creates an edge, so the LLM cannot reshape the ranking):
 
   content   the call's arguments carry content returned by an untrusted source earlier
-            in the same task (a DERIVED provenance flag; see provenance.py)
+            in the same task (a DERIVED provenance flag; see lineage/provenance.py)
   reuse     the call touches a resource (file or memory key) that an earlier call in the
             same session wrote, in this task or an earlier one. This is how a poisoned
             memory note or a planted file in one task leads to an action in a later one.
@@ -22,8 +22,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from agent_guard.models import LogLine, ResolvedPath, Status
-from agent_guard.provenance import Provenance, ProvenanceFlag
+from agent_guard.core.records import LogLine, ResolvedPath, Status
+from agent_guard.lineage.provenance import Provenance, ProvenanceFlag
 
 # Targets that name a tool rather than a resource: the host's "server:tool" fallback,
 # and descriptive targets like "testbed-repo (working tree)".

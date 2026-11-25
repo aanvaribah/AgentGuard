@@ -1,11 +1,11 @@
 """
 Deterministic checks of AgentGuard's scoring against the static corpus in
-tests/unit_tests/: tool priors, signatures, scores, the alert/review/suppress
+tests/fixtures/: tool priors, signatures, scores, the alert/review/suppress
 decision, the provenance flag, causal links and the impact vector of every
 signature alert. No Ollama, threads or file watching involved.
 
 The corpus location comes from configs/unit_test.json, the same config used to run
-AgentGuard itself over this corpus (python main.py -c configs/unit_test.json).
+AgentGuard itself over this corpus (python -m agent_guard -c configs/unit_test.json).
 """
 
 import json
@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from agent_guard.causality import CausalTracker
 from agent_guard.config import load_file
-from agent_guard.models import LogLine
-from agent_guard.paths import Resolver
-from agent_guard.provenance import ProvenanceTracker
-from agent_guard.ranking import signature_impact
-from agent_guard.scoring import assess
+from agent_guard.core.records import LogLine
+from agent_guard.detect.paths import Resolver
+from agent_guard.detect.scoring import assess
+from agent_guard.lineage.causality import CausalTracker
+from agent_guard.lineage.provenance import ProvenanceTracker
+from agent_guard.triage.impact import signature_impact
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = load_file(ROOT / "configs" / "unit_test.json")
@@ -44,8 +44,8 @@ RECORDS = {(p.name, r["seq"]): r for p in FIXTURE_FILES for r in _records(p)}
 
 
 def test_corpus_is_present():
-    assert FIXTURE_FILES, f"no fixtures in {CORPUS}; run tests/make_fixtures.py"
-    assert AGENT_ROOT.is_dir(), f"{AGENT_ROOT} must exist (commit tests/unit_tests/testbed-repo/.gitkeep)"
+    assert FIXTURE_FILES, f"no fixtures in {CORPUS}; run tests/fixtures/make_fixtures.py"
+    assert AGENT_ROOT.is_dir(), f"{AGENT_ROOT} must exist (commit tests/fixtures/testbed-repo/.gitkeep)"
 
 
 def test_every_record_has_exactly_one_expectation():

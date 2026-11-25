@@ -12,11 +12,14 @@ from pathlib import Path
 import httpx
 import ollama
 
-from agent_guard.agent.agent import DEFAULT_MODEL, AgentSession, AnalystError, Decision
-from agent_guard.agent.history import HistoryStore
-from agent_guard.models import AgentView, Confidences, LogLine
-from agent_guard.ranking import analyst_impact
-from agent_guard.reporting import reporter
+from agent_guard.analyst.agent import AgentSession, AnalystError, Decision
+from agent_guard.analyst.history import HistoryStore
+from agent_guard.analyst.view import AgentView
+from agent_guard.config import DEFAULT_MODEL
+from agent_guard.core.records import LogLine
+from agent_guard.detect.scoring import Confidences
+from agent_guard.report.reporter import reporter
+from agent_guard.triage.impact import analyst_impact
 
 MODEL_ERRORS = (AnalystError, ollama.ResponseError, ConnectionError, httpx.TransportError)
 

@@ -7,22 +7,14 @@ import json
 from dataclasses import fields
 from typing import Any
 
-from agent_guard.models import AgentView, Confidences, Finding, Status
-from agent_guard.paths import describe
+from agent_guard.analyst.view import AgentView, Finding
+from agent_guard.core.records import Status
+from agent_guard.detect.paths import describe
+from agent_guard.detect.scoring import Confidences
 
 HISTORY_FIELD_LIMIT = 240
 CURRENT_FIELD_LIMIT = 1200
 
-CATEGORIES = {
-    "ASI01": "Agent Goal Hijack",
-    "ASI02": "Tool Misuse & Exploitation",
-    "ASI03": "Identity & Privilege Abuse",
-    "ASI04": "Agentic Supply Chain Vulnerabilities",
-    "ASI05": "Unexpected Code Execution",
-    "ASI06": "Memory & Context Poisoning",
-    "ASI08": "Cascading Failures",
-    "ASI10": "Rogue Agents",
-}
 
 # An LLM wrote this because LLMs like it when LLMs say things (in-group bias, i.e. racism)
 SYSTEM_PROMPT = """You are a security analyst monitoring an autonomous engineering agent \

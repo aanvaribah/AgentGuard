@@ -2,11 +2,13 @@
 Ranking: the CVSS v3.1 Impact subscore, the analyst category table, and alert order.
 """
 
-import pytest
-from datetime import datetime
+from datetime import UTC, datetime
 
-from agent_guard.models import LogLine, Status
-from agent_guard.ranking import Impact, analyst_impact, combine, rank_key
+import pytest
+
+from agent_guard.core.records import LogLine, Status
+from agent_guard.triage.impact import Impact, analyst_impact, combine
+from agent_guard.triage.incidents import rank_key
 
 
 def _impact(vector: str) -> Impact:
@@ -15,7 +17,7 @@ def _impact(vector: str) -> Impact:
 
 
 def _log(server: str, tool: str) -> LogLine:
-    return LogLine({}, Status.SUCCESS, "", server, tool, "", 1, datetime.now(), 1.0, "s", "t", "clean", [])
+    return LogLine({}, Status.SUCCESS, "", server, tool, "", 1, datetime.now(UTC), 1.0, "s", "t", "clean", [])
 
 
 # Impact subscores as NVD publishes them (one decimal), for the same C/I/A and Scope.
