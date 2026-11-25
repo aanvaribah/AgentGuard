@@ -4,6 +4,7 @@ Session registry! We need to map session IDs to agents.
 
 import asyncio
 import concurrent.futures
+import secrets
 import sqlite3
 import threading
 from functools import partial
@@ -37,6 +38,7 @@ class SessionRegistry:
         self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
         self._thread.start()
         self._store: HistoryStore | None = None
+        self._fence_key = secrets.token_bytes(32)
         self._model = DEFAULT_MODEL
 
     def configure(self, db_path: Path, model: str = DEFAULT_MODEL) -> None:
@@ -51,7 +53,7 @@ class SessionRegistry:
         with self._lock:
             if session_id not in self._sessions:
                 self._sessions[session_id] = AgentSession(
-                    session_id, self._store, self._model
+                    session_id, self._store, self._fence_key, self._model
                 )
             return self._sessions[session_id]
 

@@ -148,6 +148,7 @@ def main() -> None:
         str(cfg.server_cwd) if cfg.server_cwd else None,
     )
     report_models(models)
+
     registry.configure(cfg.mirror_root / "history.sqlite3", model=cfg.model)
     reporter.configure(cfg.mirror_root / "agentguard-events.jsonl", view)
 

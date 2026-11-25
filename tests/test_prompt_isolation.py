@@ -18,7 +18,12 @@ import pytest
 
 from agent_guard.analyst.agent import MAX_ATTEMPTS, AgentSession, AnalystError
 from agent_guard.analyst.history import HistoryStore
-from agent_guard.analyst.prompts import build_review, render_call, render_finding
+from agent_guard.analyst.prompts import (
+    build_review,
+    fence_code,
+    render_call,
+    render_finding,
+)
 from agent_guard.analyst.registry import SessionRegistry
 from agent_guard.analyst.view import AgentView, Finding
 from agent_guard.core.records import LogLine, ResolvedPath, Status
@@ -46,6 +51,8 @@ HEADERS = [
     "RELATED HISTORY:",
     "CALL UNDER REVIEW:",
 ]
+KEY = b"agentguard-tests"
+CODE = fence_code(KEY, "s", 5)
 FENCE = re.compile(r"<\s*/?\s*log_data", re.IGNORECASE)
 DATA_LINE = re.compile(
     r"^(?:(?:\[earlier task\] )?seq \d+ |  (?:target|resolved|args|result): |\(none\)$|$)"
@@ -92,6 +99,7 @@ def review(current: AgentView, finding_detail="git.git_diff: on .", recent=()) -
         current,
         1,
         Confidences(tool_risk=0.3),
+        CODE,
     )
 
 
@@ -100,10 +108,10 @@ def check_structure(prompt: str) -> None:
         "a raw control or line-break character reached the prompt"
     )
     fences = [m.start() for m in FENCE.finditer(unicodedata.normalize("NFKC", prompt))]
-    assert len(fences) == 2 and fences[0] == 0, (
-        "recorded data opened or closed the <log_data> fence"
+    assert prompt.startswith(f"<log_data_{CODE}>\n"), (
+        "the data doesn't open with this review's tag"
     )
-    data, trailer = prompt.split("</log_data>\n\n")
+    data, trailer = prompt.split(f"</log_data_{CODE}>\n\n")
     lines = data.split("\n")[1:]
     for h in HEADERS:
         assert lines.count(h) == 1, f"forged section header {h!r}"
@@ -197,7 +205,7 @@ def verdict(**kw) -> str:
 
 def session(tmp_path, model: ScriptedModel) -> AgentSession:
     return AgentSession(
-        "s", HistoryStore(tmp_path / "h.sqlite3", client=model), client=model
+        "s", HistoryStore(tmp_path / "h.sqlite3", client=model), KEY, client=model
     )
 
 
@@ -269,3 +277,31 @@ def test_analyst_verdicts_never_become_findings(tmp_path):
     assert (
         s.store.findings(view(seq=6), s.store.task_instance("s", "task-1")[0], 20) == []
     )
+
+
+#
+# Fence code tests
+#
+
+
+def test_fence_codes_are_stable_per_call_and_unpredictable_without_the_key():
+    assert fence_code(KEY, "s", 5) == fence_code(KEY, "s", 5)
+    assert (
+        len(
+            {
+                fence_code(KEY, "s", 5),
+                fence_code(KEY, "s", 6),
+                fence_code(KEY, "t", 5),
+                fence_code(b"another key", "s", 5),
+            }
+        )
+        == 4
+    )
+    assert re.fullmatch(r"[0-9a-f]{16}", CODE)
+
+
+def test_the_model_sees_the_coded_fence(tmp_path):
+    model = ScriptedModel(verdict())
+    judge(session(tmp_path, model), view(seq=5))
+    user = model.prompts[0][1]["content"]
+    assert user.startswith(f"<log_data_{CODE}>") and f"</log_data_{CODE}>" in user

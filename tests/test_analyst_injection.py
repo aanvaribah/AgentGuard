@@ -222,7 +222,7 @@ def run(s: Scenario, text: str, db: Path) -> bool:
     """Feeds the session through the analyst as AgentGuard would; returns the verdict on the last call."""
 
     async def go():
-        session = AgentSession("injection-test", HistoryStore(db))
+        session = AgentSession("injection-test", HistoryStore(db), b"agentguard-tests")
         verdict = None
         for seq, c in enumerate(s.calls, start=1):
             server, tool = c.tool.split(".")
@@ -272,15 +272,25 @@ def run(s: Scenario, text: str, db: Path) -> bool:
     return asyncio.run(go())
 
 
+_CONTROLS: dict[str, bool] = {}
+
+
+def control(s: Scenario, tmp_path: Path) -> bool:
+    """Both tests need the control verdict; it's deterministic, so it's computed once."""
+    if s.name not in _CONTROLS:
+        _CONTROLS[s.name] = run(s, "", tmp_path / "control.sqlite3")
+    return _CONTROLS[s.name]
+
+
 @pytest.mark.parametrize("s", SCENARIOS, ids=lambda s: s.name)
 def test_injection_does_not_change_the_verdict(s, tmp_path):
-    control = run(s, "", tmp_path / "control.sqlite3")
+    expected = control(s, tmp_path)
     injected = run(s, s.payload, tmp_path / "injected.sqlite3")
-    assert injected == control, (
-        f"the payload flipped the verdict from alert={control} to alert={injected}"
+    assert injected == expected, (
+        f"the payload flipped the verdict from alert={expected} to alert={injected}"
     )
 
 
 @pytest.mark.parametrize("s", SCENARIOS, ids=lambda s: s.name)
 def test_control_verdict(s, tmp_path):
-    assert run(s, "", tmp_path / "control.sqlite3") == s.alert
+    assert control(s, tmp_path) == s.alert

@@ -10,7 +10,7 @@ import ollama
 from pydantic import BaseModel, Field, ValidationError
 
 from agent_guard.analyst.history import HistoryStore
-from agent_guard.analyst.prompts import SYSTEM_PROMPT, build_review
+from agent_guard.analyst.prompts import SYSTEM_PROMPT, build_review, fence_code
 from agent_guard.analyst.view import AgentView, Finding
 from agent_guard.config import DEFAULT_MODEL
 from agent_guard.detect.paths import describe
@@ -48,11 +48,13 @@ class AgentSession:
         self,
         session_id: str,
         store: HistoryStore,
+        fence_key: bytes,
         model: str = DEFAULT_MODEL,
         client=None,
     ):
         self.session_id = session_id
         self.store = store
+        self.fence_key = fence_key
         self.model = model
         self._client = client or ollama.AsyncClient()
         self._lock = asyncio.Lock()
@@ -116,7 +118,13 @@ class AgentSession:
             {
                 "role": "user",
                 "content": build_review(
-                    findings, recent, related, view, ordinal, confidences
+                    findings,
+                    recent,
+                    related,
+                    view,
+                    ordinal,
+                    confidences,
+                    fence_code(self.fence_key, self.session_id, view.seq),
                 ),
             },
         ]
