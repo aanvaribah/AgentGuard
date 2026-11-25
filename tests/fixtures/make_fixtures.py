@@ -4,7 +4,7 @@ Builds the static unit-test corpus in tests/fixtures/ and its expected results.
 
 import argparse
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -952,7 +952,7 @@ REFERENCE = {
 
 
 def write_fixture(name: str, session_id: str, cases: list[dict]) -> list[dict]:
-    start = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
     expected, lines = [], []
     for seq, c in enumerate(cases, start=1):
         record = {

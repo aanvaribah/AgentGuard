@@ -196,6 +196,7 @@ A call can appear twice: first as `REVIEWING`, then again with the analyst's ver
 | `<corpus path>/*.jsonl` | Verified copy of every log line read |
 | `agentguard-events.jsonl` | Every AgentGuard event as JSON: call decisions, verdicts, impact, provenance, causal links, tamper and system notices |
 | `history.sqlite3` | The analyst's history: every call, its resources and embeddings, signature findings |
+| `reports/` | HTML reports, rebuilt from the event log every time AgentGuard exits: `index.html` and one page per session. Print a page from the browser for a PDF. |
 
 ## Detection details
 

@@ -14,6 +14,7 @@ from agent_guard.analyst.models import ModelInfo, inspect
 from agent_guard.analyst.registry import registry
 from agent_guard.config import EMBED_MODEL, ConfigError, resolve
 from agent_guard.ingest.watcher import AGEventHandler
+from agent_guard.report.html import write_reports
 from agent_guard.report.live import LiveView
 from agent_guard.report.plain import PlainView
 from agent_guard.report.reporter import LibraryLogHandler, reporter
@@ -105,6 +106,12 @@ def main() -> None:
         default=None,
         help="Disable the TUI (--no-plain forces it on, overriding the config).",
     )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="Write an HTML report of the run here on exit.",
+    )
     args = parser.parse_args()
 
     try:
@@ -147,10 +154,11 @@ def main() -> None:
         str(cfg.mirror_root),
         str(cfg.server_cwd) if cfg.server_cwd else None,
     )
-    report_models(models)
 
+    events_path = cfg.mirror_root / "agentguard-events.jsonl"
     registry.configure(cfg.mirror_root / "history.sqlite3", model=cfg.model)
-    reporter.configure(cfg.mirror_root / "agentguard-events.jsonl", view)
+    reporter.configure(events_path, view)
+    report_models(models)  # after configure, so the digests reach the event log
 
     observer = Observer()
     observer.schedule(event_handler, str(cfg.corpus), recursive=True)
@@ -168,6 +176,14 @@ def main() -> None:
             observer.stop()
 
     observer.join()
+
+    # Fresh reports on every exit, rebuilt from the whole event log.
+    reports = cfg.mirror_root / "reports"
+    try:
+        write_reports(events_path, reports)
+        print(f"Reports written to {reports / 'index.html'}")
+    except OSError as e:
+        print(f"Can't write the reports: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

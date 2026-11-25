@@ -158,12 +158,12 @@ class Reporter:
         # event; later verdict events for the same call don't repeat them, so they are
         # only set here.
         row = rows.get(e.seq) or rows.setdefault(  # type: ignore
-            e.seq,
+            e.seq, # type: ignore
             Row(
-                e.seq,
-                e.tool,
-                e.target,
-                e.score,
+                e.seq,  # type: ignore
+                e.tool,  # type: ignore
+                e.target,  # type: ignore
+                e.score,  # type: ignore
                 e.decision,  # type: ignore
                 provenance=e.provenance,
                 provenance_sources=list(e.provenance_sources),
@@ -171,7 +171,7 @@ class Reporter:
                 first_seen=e.time,
             ),
         )
-        row.decision, row.score, row.source, row.label = (
+        row.decision, row.score, row.source, row.label = ( # type: ignore
             e.decision,
             e.score,
             e.source,

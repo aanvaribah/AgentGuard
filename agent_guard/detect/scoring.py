@@ -12,7 +12,7 @@ from typing import Literal
 from agent_guard.core.records import LogLine, ResolvedPath
 from agent_guard.detect.paths import Resolver
 from agent_guard.detect.priors import tool_risk
-from agent_guard.detect.signatures import argument_injection, path_escape, fence_forgery
+from agent_guard.detect.signatures import argument_injection, fence_forgery, path_escape
 
 Route = Literal["alert", "review", "suppress"]
 

@@ -108,6 +108,7 @@ def check_structure(prompt: str) -> None:
         "a raw control or line-break character reached the prompt"
     )
     fences = [m.start() for m in FENCE.finditer(unicodedata.normalize("NFKC", prompt))]
+    assert len(fences) == 2 and fences[0] == 0, "recorded data opened or closed the <log_data> fence"
     assert prompt.startswith(f"<log_data_{CODE}>\n"), (
         "the data doesn't open with this review's tag"
     )
