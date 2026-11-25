@@ -1,14 +1,7 @@
 """
-Static HTML reports, built from an event log (agentguard-events.jsonl): an index page for
-the whole log and one page per session. AgentGuard rewrites them every time it exits;
-they can also be built by hand:
+Static HTML reports, styles and whatnot are all LLM generated.
 
-    python -m agent_guard.report.html mirror/agentguard-events.jsonl -o mirror/reports
-
-Pages are self-contained (no scripts, no external resources, a CSP that forbids both)
-and print cleanly, so the browser's Print -> Save as PDF gives a PDF. Every value from
-the log is attacker-influenced and is escaped; session ids only reach file names after
-sanitizing.
+I am *NOT* a front-end developer.
 """
 
 import argparse
@@ -240,22 +233,6 @@ def _skipped(run: Run) -> str:
             f'could not be read and were left out.</p>')
 
 
-METHOD = f"""
-<section class="method">
-  <h2>Method</h2>
-  <p>Each call is scored from a tool-risk prior and deterministic signatures (path traversal, argument
-    injection, forged analyst data tags). Scores above {ALERT_THRESH} alert; scores from {REVIEW_THRESH}
-    to {ALERT_THRESH} go to the LLM analyst; lower scores are suppressed. Impact is the CVSS v3.1 Impact
-    subscore of what an alerting call did or attempted, from fixed tables; the analyst never sets it.
-    A call the analyst failed to judge is treated as an alert. Incidents are calls linked by content
-    flow or resource reuse that include at least one alert, rooted at the earliest call, and ranked by
-    chain impact (the highest impact of any alert in the incident), then number of alerts, then
-    earliest root.</p>
-  <p>Analyst categories (OWASP Top 10 for Agentic Applications):</p>
-  <ul>{"".join(f"<li><b>{k}</b> {html.escape(v)}</li>" for k, v in CATEGORIES.items())}</ul>
-</section>"""
-
-
 def render_session(run: Run, sid: str) -> str:
     """One session's page: its incidents in full, then every call."""
     sub = run.only(sid)
@@ -282,7 +259,7 @@ def render_session(run: Run, sid: str) -> str:
   {_call_rows(sub, sid, sorted(sub.snap.sessions[sid]))}
   </tbody></table>
 </section>
-{METHOD}"""
+"""
     return _page(f"AgentGuard: session {clean(sid)}", header, body)
 
 
@@ -345,7 +322,7 @@ def render_index(run: Run) -> str:
   {f'<table><thead><tr><th>time</th><th>level</th><th>message</th></tr></thead><tbody>{notices}</tbody></table>'
    if notices else '<p class="ok">None.</p>'}
 </section>
-{METHOD}"""
+"""
     return _page("AgentGuard report", header, body)
 
 
