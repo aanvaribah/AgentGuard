@@ -204,10 +204,9 @@ class Row:
 @dataclass
 class Snapshot:
     sessions: dict[str, dict[int, Row]]
-    order: list[str]    # session ids in decending order of recency
+    order: list[str]    # session ids, least recently active first
     integrity: list[Event]
     notices: list[Event]
-    order: list[str]
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,8 @@
 """
 Deterministic checks of AgentGuard's scoring against the static corpus in
 tests/unit_tests/: tool priors, signatures, scores, the alert/review/suppress
-decision, the provenance flag and the impact vector of every signature alert.
-No Ollama, threads or file watching involved.
+decision, the provenance flag, causal links and the impact vector of every
+signature alert. No Ollama, threads or file watching involved.
 
 The corpus location comes from configs/unit_test.json, the same config used to run
 AgentGuard itself over this corpus (python main.py -c configs/unit_test.json).
@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_guard.causality import CausalTracker
 from agent_guard.config import load_file
 from agent_guard.models import LogLine
 from agent_guard.paths import Resolver
@@ -80,12 +81,16 @@ def test_expected_result(exp):
 
 
 @pytest.mark.parametrize("path", FIXTURE_FILES, ids=lambda p: p.name)
-def test_provenance(path):
-    """Provenance depends on earlier records, so each file is replayed in seq order."""
+def test_provenance_and_causal_links(path):
+    """Both depend on earlier records, so each file is replayed in seq order."""
     expected = {e["seq"]: e for e in EXPECTED if e["file"] == path.name}
-    tracker = ProvenanceTracker()
+    provenance, causes = ProvenanceTracker(), CausalTracker()
     for r in _records(path):
-        flag = tracker.observe(LogLine.from_dict(dict(r)))
-        got = None if flag is None else {"kind": flag.kind.value, "sources": list(flag.sources)}
+        log = LogLine.from_dict(dict(r))
+        flag = provenance.observe(log)
+        links = causes.observe(log, RESOLVER.resolve(log), flag)
         exp = expected[r["seq"]]
-        assert got == exp["provenance"], f"{path.name} seq {r['seq']}: {exp['why']}"
+        why = f"{path.name} seq {r['seq']}: {exp['why']}"
+        got = None if flag is None else {"kind": flag.kind.value, "sources": list(flag.sources)}
+        assert got == exp["provenance"], why
+        assert list(links.parents) == exp["caused_by"], why

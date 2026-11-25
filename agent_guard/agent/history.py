@@ -14,7 +14,6 @@ import json
 import math
 import sqlite3
 from array import array
-from collections.abc import Iterator
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -89,6 +88,10 @@ def _view_from_json(s: str) -> AgentView:
     return AgentView(**d)
 
 
+def _keys(v: AgentView) -> set[str]:
+    return resource_keys(v.arguments, v.target_resource, v.resolved_paths)
+
+
 def _embed_text(v: AgentView) -> str:
     args = " ".join(strings(v.arguments))
     return f"{v.server}.{v.tool_name} {v.target_resource} {args} {v.result_summary}"[:EMBED_TEXT_LIMIT]
@@ -154,7 +157,7 @@ class HistoryStore:
             "INSERT OR REPLACE INTO calls VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 v.session_id, v.seq, task_key, task_ordinal, _view_to_json(v),
-                json.dumps(sorted(_resource_keys(v))),
+                json.dumps(sorted(_keys(v))),
                 json.dumps(sorted(tokens(v.result_summary))),
                 array("f", emb).tobytes() if emb else None,
             ),
@@ -171,7 +174,7 @@ class HistoryStore:
     def findings(self, v: AgentView, task_key: str, limit: int) -> list[tuple[Finding, bool]]:
         """Findings from this task along with findings from earlier tasks 
         with a call that touched a resource this one also touches."""
-        cur_keys = _resource_keys(v)
+        cur_keys = _keys(v)
         out: list[tuple[Finding, bool]] = []
         for seq, source, label, detail, f_task, keys in self._db.execute(
             "SELECT f.seq, f.source, f.label, f.detail, c.task_key, c.keys FROM findings f "
@@ -194,7 +197,7 @@ class HistoryStore:
         """Earlier calls are ranked by resource sharing, content flows,
         task, and embedding similarity within the same task. For earlier
         tasks, just shared resources."""
-        cur_keys = _resource_keys(v)
+        cur_keys = _keys(v)
         cur_tokens = tokens(" ".join(strings(v.arguments)))
         row = self._db.execute(
             "SELECT embedding FROM calls WHERE session_id = ? AND seq = ?", (v.session_id, v.seq)
