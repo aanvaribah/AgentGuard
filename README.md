@@ -176,7 +176,7 @@ Every line AgentGuard has read is copied to its mirror. On the next run, lines a
 
 ### TUI
 
-![TUI](media/images/tui.png)
+![TUI](media/images/TUI.png)
 
 From top to bottom:
 1. **Incidents panel.** Incidents ranked by chain impact. Each shows its CVSS vector, its members (`seq root → others`), the verdict, and the root cause when it differs from the top alert.
