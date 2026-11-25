@@ -3,6 +3,8 @@ Deterministic signature detection. Matches give a confidence and explanation,
 1.0 indicates a signature match.
 """
 
+import re
+import unicodedata
 from typing import Any
 
 from agent_guard.core.records import LogLine, ResolvedPath
@@ -13,6 +15,8 @@ OPTION_POSITIONS: dict[tuple[str, str], tuple[tuple[str, str, str], ...]] = {
 }
 
 ABBREVIATES = {"git_init"}
+
+FENCE_TAG = re.compile(r"(?:<|&lt;?|&#0*60;?|&#x0*3c;?|\\u003c|\\x3c|%3c)\s*/?\s*log_data", re.IGNORECASE)
 
 KNOWN_OPTIONS: dict[str, dict[str, str]] = {
     "git_diff": {
@@ -50,6 +54,18 @@ def argument_injection(fline: LogLine) -> tuple[float, str | None]:
         return 0.0, None
     arg, tok = found
     return 1.0, f"{arg} {tok!r} {_describe_option(fline.tool_name, tok)}"
+
+
+def fence_forgery(fline: LogLine) -> tuple[float, str | None]:
+    """Check if someone is trying to forge the fence we put around untrusted
+    data for the analyst agent."""
+    fields = [("tool name", f"{fline.server}.{fline.tool_name}")]
+    fields += [(f"argument {k!r}", text) for k, v in fline.arguments.items() for text in (str(k), *_strings(v))]
+    for where, text in fields:
+        m = FENCE_TAG.search(unicodedata.normalize("NFKC", text))
+        if m:
+            return 1.0, f"{where} contains {m.group(0)!r}, a forged tag of the analyst's data block"
+    return 0.0, None
 
 
 def injected_option(fline: LogLine) -> str | None:
@@ -103,3 +119,12 @@ def _find_option(fline: LogLine) -> tuple[str, str] | None:
             if tok.startswith("-"):
                 return arg, tok
     return None
+
+
+def _strings(value: Any) -> list[str]:
+    """Every string in a JSON value, dictionary keys included."""
+    if isinstance(value, dict):
+        return [s for k, v in value.items() for s in (str(k), *_strings(v))]
+    if isinstance(value, (list, tuple)):
+        return [s for v in value for s in _strings(v)]
+    return [value] if isinstance(value, str) else []

@@ -12,7 +12,7 @@ from typing import Literal
 from agent_guard.core.records import LogLine, ResolvedPath
 from agent_guard.detect.paths import Resolver
 from agent_guard.detect.priors import tool_risk
-from agent_guard.detect.signatures import argument_injection, path_escape
+from agent_guard.detect.signatures import argument_injection, path_escape, fence_forgery
 
 Route = Literal["alert", "review", "suppress"]
 
@@ -25,6 +25,7 @@ class Confidences:
     tool_risk: float = 0.0
     path_traversal: float = 0.0
     argument_injection: float = 0.0
+    fence_forgery: float = 0.0
 
     @property
     def overall(self) -> float:
@@ -64,10 +65,12 @@ def assess(resolver: Resolver, log: LogLine) -> Assessment:
     resolved = resolver.resolve(log)
     escape, escape_detail = path_escape(resolved)
     injection, injection_detail = argument_injection(log)
+    forgery, forgery_detail = fence_forgery(log)
     confidences = Confidences(
         tool_risk=tool_risk(log.server, log.tool_name),
         path_traversal=escape,
         argument_injection=injection,
+        fence_forgery=forgery
     )
     score = confidences.overall
     if score > ALERT_THRESH:
@@ -76,5 +79,5 @@ def assess(resolver: Resolver, log: LogLine) -> Assessment:
         decision = "review"
     else:
         decision = "suppress"
-    details = tuple(d for d in (escape_detail, injection_detail) if d)
+    details = tuple(d for d in (escape_detail, injection_detail, forgery_detail) if d)
     return Assessment(decision, confidences, resolved, details)

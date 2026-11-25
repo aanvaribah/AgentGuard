@@ -103,6 +103,8 @@ OPTIONS = {
 }
 UNKNOWN_OPTION = Impact("L", "L", "N", "U", "git option with no known effect")
 
+FENCE_FORGERY = Impact("N", "L", "N", "C", "forges the analyst's data boundary to evade review")
+
 # Analyst categories: the least each category implies, raised onto the tool's base.
 CATEGORY = {
     "ASI01": Impact("N", "H", "N", "U", "acts on a goal other than the operator's"),
@@ -125,6 +127,8 @@ def signature_impact(log: LogLine, a: Assessment) -> Impact:
         parts.append(OUTSIDE[cls])
     if a.confidences.argument_injection >= 0.5:
         parts.append(OPTIONS.get(injected_option(log) or "", UNKNOWN_OPTION))
+    if a.confidences.fence_forgery >= 0.5:
+        parts += [BASE[cls], FENCE_FORGERY]
     return combine(*parts) if parts else BASE[cls]
 
 
