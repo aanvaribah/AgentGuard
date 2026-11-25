@@ -160,7 +160,7 @@ Every line AgentGuard has read is copied to its mirror. On the next run, lines a
 
 ### TUI
 
-![TUI](images/tui.png)
+![TUI](media/images/tui.png)
 
 From top to bottom:
 1. **Incidents panel.** Incidents ranked by chain impact. Each shows its CVSS vector, its members (`seq root → others`), the verdict, and the root cause when it differs from the top alert.
@@ -181,7 +181,7 @@ One line per event:
 
 A call can appear twice: first as `REVIEWING`, then again with the analyst's verdict. On exit, plain mode prints the ranked incidents:
 
-![Ranked incidents](images/plain-summary.png)
+![Ranked incidents](images/plain.png)
 
 ### Files in the mirror directory
 

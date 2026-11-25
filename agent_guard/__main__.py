@@ -17,7 +17,6 @@ from agent_guard.report.live import LiveView
 from agent_guard.report.plain import PlainView
 from agent_guard.report.reporter import LibraryLogHandler, reporter
 
-MIN_VERSION = (3, 11) # This means 3.11
 BANNER = r"""
     _                    _    ____                     _
    / \   __ _  ___ _ __ | |_ / ___|_   _  __ _ _ __ __| |
