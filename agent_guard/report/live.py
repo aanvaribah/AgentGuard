@@ -18,11 +18,11 @@ from agent_guard.triage.incidents import Incident, ranked
 class LiveView:
     """Such a fancy TUI that you'd think I'm a Rust dev."""
 
-    def __init__(self, source: Reporter, *, watch: str, mirror: str, model: str,
+    def __init__(self, source: Reporter, *, watch: str, mirror: str, models: str,
                  max_rows: int = 14, max_sessions: int = 2, max_incidents: int = 6,
                  console: Console | None = None):
         self.source = source
-        self.watch, self.mirror, self.model = watch, mirror, model
+        self.watch, self.mirror, self.model = watch, mirror, models
         self.max_rows, self.max_sessions = max_rows, max_sessions
         self.max_incidents = max_incidents
         self._live = Live(
@@ -50,7 +50,7 @@ class LiveView:
             body.append(self._session(sid, snap.sessions[sid])) # type: ignore
         return Panel(
             Group(*body),
-            title=Text.assemble(("AgentGuard", "bold"), f" · watching {self.watch} · mirror {self.mirror} · analyst {self.model}"),
+            title=Text.assemble(("AgentGuard", "bold"), f" · watching {self.watch} · mirror {self.mirror} · analyst {self.models}"),
             title_align="left",
             subtitle=self._footer(snap, found),
             subtitle_align="left",

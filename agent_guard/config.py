@@ -13,6 +13,12 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "default.json"
 DEFAULT_MODEL = "qwen2.5:7b"  # Ollama model for the analyst
+EMBED_MODEL = "nomic-embed-text:v1.5"
+
+PINNED = {
+    "qwen2.5:7b": "845dbda0ea48",
+    "nomic-embed-text:v1.5": "0a109f422b47",
+}
 
 # key -> (kind, built-in default). "path?" may be null; for mirror_root, null means
 # "use a fresh temporary directory", which keeps repeated test runs independent.

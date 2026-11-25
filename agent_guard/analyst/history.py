@@ -22,12 +22,12 @@ import httpx
 import ollama
 
 from agent_guard.analyst.view import AgentView, Finding
+from agent_guard.config import EMBED_MODEL
 from agent_guard.core.records import ResolvedPath, Status
 from agent_guard.lineage.causality import resource_keys
 from agent_guard.lineage.tokens import FLOW_MIN, strings, tokens, weight
 from agent_guard.report.reporter import reporter
 
-EMBED_MODEL = "nomic-embed-text"
 # For when we get a tool instead of a resource ("server:tool" fallback)
 MIN_SCORE = 1.0  # relevance floor
 EMBED_TEXT_LIMIT = 2000

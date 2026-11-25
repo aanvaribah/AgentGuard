@@ -1,4 +1,4 @@
-# AgentGuard
+# AgentGuard v0.8
 
 AgentGuard monitors the tool calls of an autonomous coding agent and flags the ones that look like an attack. It was built for the ADOP testbed ([GMU-CYSE/adop-cyse](https://github.com/GMU-CYSE/adop-cyse)) and reads only ADOP's audit logs (the `corpus/` JSONL files). It never talks to the agent or the MCP servers.
 
@@ -46,7 +46,7 @@ Every call, whatever its score, is stored in the analyst's history so later revi
 
 Requirements:
 - Python 3.11 or newer
-- [Ollama](https://ollama.com/download), with the `qwen2.5:7b` (analyst) and `nomic-embed-text` (history retrieval) models
+- [Ollama](https://ollama.com/download), installed with Ollama's official installer and running
 - An ADOP checkout
 
 ### Linux
@@ -64,13 +64,19 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned   # may be needed to run the
 venv\Scripts\Activate.ps1
 ```
 
-The installers create a virtual environment, install `requirements.txt` and pull both models. If Ollama is missing they offer to run Ollama's official installer (`https://ollama.com/install.sh` or `install.ps1`). To install by hand:
+The installers check for Python 3.11+ and Ollama, create a virtual environment, install `requirements.txt`, then pull the two models and verify them. If Ollama isn't installed they stop and point you to Ollama's official installer.
+
+| Model | Role | Pinned digest |
+|---|---|---|
+| `qwen2.5:7b` | analyst | `845dbda0ea48` |
+| `nomic-embed-text:v1.5` | history retrieval | `0a109f422b47` |
+
+Ollama pulls by tag, and a tag can be moved to new weights, so the installer fails if a pulled model's digest isn't the one AgentGuard was tested with. To install by hand:
 
 ```bash
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-ollama pull qwen2.5:7b
-ollama pull nomic-embed-text
+python -m agent_guard.analyst.models          # pull and verify; --check to verify only
 ```
 
 ## Running AgentGuard
@@ -91,7 +97,7 @@ python main.py [-c CONFIG] [-p PATH] [-a AGENT_ROOT] [-s SERVER_CWD]
 | `-a`, `--agent-root` | `agent_root` | The agent's sandbox (`adop-cyse/testbed-repo/`) | required |
 | `-s`, `--server-cwd` | `server_cwd` | Working directory of the MCP server process | parent of `agent_root` |
 | `-m`, `--mirror-root` | `mirror_root` | Where mirrors, the event log and the history database go | `mirror/` in the AgentGuard directory |
-| `--model` | `model` | Ollama model for the analyst | `qwen2.5:7b` |
+| `--model` | `model` | Ollama model for the analyst (only `qwen2.5:7b` is pinned) | `qwen2.5:7b` |
 | `--plain` / `--no-plain` | `plain` | Plain line output instead of the TUI | off (plain is always used when stdout is not a terminal) |
 
 ### Configuration

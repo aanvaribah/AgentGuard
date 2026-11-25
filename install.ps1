@@ -1,6 +1,12 @@
 # requires -version 5.1
 $ErrorActionPreference = "Stop"
 
+# Native commands don't stop the script on failure, even with "Stop"; check their exit codes.
+function Invoke-Checked {
+    & $args[0] $args[1..($args.Length - 1)]
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 $PyName = $null
 foreach ($candidate in @("py", "python", "python3")) {
     if (Get-Command $candidate -ErrorAction SilentlyContinue) {
@@ -14,26 +20,26 @@ if (-not $PyName) {
     exit 1
 }
 
-if (-not (Get-Command "ollama" -ErrorAction SilentlyContinue)) {
-    $confirm = Read-Host "Ollama not found. Install it now? [y/N]"
-    if ($confirm -match '^[Yy]$') {
-        irm https://ollama.com/install.ps1 | iex
-    } else {
-        Write-Error "Ollama is required for AgentGuard, please install it."
-        exit 1
-    }
+& $PyName -c "import sys; sys.exit(sys.version_info < (3, 11))"
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "AgentGuard needs Python 3.11 or newer ($PyName is $(& $PyName -V 2>&1))."
+    exit 1
 }
 
-iex "$PyName -m venv venv"
-iex "venv\Scripts\python.exe -m pip install -r requirements.txt"
+if (-not (Get-Command "ollama" -ErrorAction SilentlyContinue)) {
+    Write-Host "Ollama is required but not installed. Install it with Ollama's official installer:" -ForegroundColor Red
+    Write-Host "  https://ollama.com/download"
+    Write-Host "then start it and rerun this script."
+    exit 1
+}
 
-ollama pull qwen2.5:7b
-ollama pull nomic-embed-text
+Invoke-Checked $PyName -m venv venv
+Invoke-Checked "venv\Scripts\python.exe" -m pip install -r requirements.txt
 
-Start-Sleep -Seconds 1
-Clear-Host
+# Pulls the pinned models and checks their digests.
+Invoke-Checked "venv\Scripts\python.exe" -m agent_guard.analyst.models
 
-$Banner = @"
+$Banner = @'
 
     _                    _    ____                     _
    / \   __ _  ___ _ __ | |_ / ___|_   _  __ _ _ __ __| |
@@ -41,7 +47,7 @@ $Banner = @"
  / ___ \ (_| |  __/ | | | |_| |_| | |_| | (_| | | | (_| |
 /_/   \_\__, |\___|_| |_|\__|\____|\__,_|\__,_|_|  \__,_|
         |___/
-"@
+'@
 
 Write-Output $Banner
 Write-Output ""

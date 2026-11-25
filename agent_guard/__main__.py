@@ -10,8 +10,9 @@ from pathlib import Path
 
 from watchdog.observers import Observer
 
+from agent_guard.analyst.models import ModelInfo, inspect
 from agent_guard.analyst.registry import registry
-from agent_guard.config import ConfigError, resolve
+from agent_guard.config import EMBED_MODEL, ConfigError, resolve
 from agent_guard.ingest.watcher import AGEventHandler
 from agent_guard.report.live import LiveView
 from agent_guard.report.plain import PlainView
@@ -27,13 +28,27 @@ BANNER = r"""
 """
 
 
-def print_banner(watch_path: Path, agent_root: Path, mirror_root: Path, config_file: Path | None) -> None:
+def print_banner(watch_path: Path, agent_root: Path, mirror_root: Path, config_file: Path | None,
+                 models: list[ModelInfo]) -> None:
     print(BANNER)
     print(f"  config   : {config_file or '(none, command line only)'}")
     print(f"  watching : {watch_path}")
     print(f"  sandbox  : {agent_root}")
     print(f"  mirror   : {mirror_root}")
+    print(f"  models   : {', '.join(f'{m.role} {m.label}' for m in models)}")
     print(f"  {'-' * 40}\n")
+
+
+def report_models(models: list[ModelInfo]) -> None:
+    for m in models:
+        reporter.info(f"{m.role} model {m.name}, digest {m.digest or 'unknown'}")
+    for m in models:
+        if m.problem is None:
+            continue
+        if m.role == "analyst" and m.status in ("missing", "mismatch"):
+            reporter.critical(m.problem)
+        else:
+            reporter.warning(m.problem)
 
 
 def main() -> None:
@@ -70,10 +85,12 @@ def main() -> None:
     except ConfigError as e:
         parser.error(str(e))
 
+    models = inspect({"analyst": cfg.model, "embedding": EMBED_MODEL})
     plain = cfg.plain or not sys.stdout.isatty()
-    view = PlainView(reporter) if plain else LiveView(reporter, watch=str(cfg.corpus), mirror=str(cfg.mirror_root), model=cfg.model)
+    labels = " · ".join(f"{m.role} {m.label}" for m in models)
+    view = PlainView(reporter) if plain else LiveView(reporter, watch=str(cfg.corpus), mirror=str(cfg.mirror_root), models=labels)
     if plain:
-        print_banner(cfg.corpus, cfg.agent_root, cfg.mirror_root, cfg.config_file)
+        print_banner(cfg.corpus, cfg.agent_root, cfg.mirror_root, cfg.config_file, models)
 
     logging.basicConfig(level=logging.WARNING, handlers=[LibraryLogHandler()], force=True)
 
@@ -81,6 +98,7 @@ def main() -> None:
         str(cfg.agent_root), str(cfg.corpus), str(cfg.mirror_root),
         str(cfg.server_cwd) if cfg.server_cwd else None,
     )
+    report_models(models)
     registry.configure(cfg.mirror_root / "history.sqlite3", model=cfg.model)
     reporter.configure(cfg.mirror_root / "agentguard-events.jsonl", view)
 
