@@ -37,7 +37,11 @@ class Resolver:
         base = self.base(log.server, log.tool_name)
         found = [(a, str(log.arguments[a])) for a in PATH_ARGS if a in log.arguments]
         if (log.server, log.tool_name) == ("git", "git_init"):
+            # git parses a target_path starting with "-" as an option, not a path;
+            # the argument-injection signature reports it instead.
             found = [(a, raw) for a, raw in found if not raw.startswith("-")]
+        if (log.server, log.tool_name) == ("git", "git_diff"):
+            found += [("pathspec", t) for t in _tokens(log.arguments.get("pathspec", "")) if not t.startswith("-")]
         return tuple(self._one(arg, raw, base) for arg, raw in found)
 
     def _one(self, arg: str, raw: str, base: Path) -> ResolvedPath:
