@@ -37,10 +37,10 @@ Every call is scored by deterministic signatures and tool-risk priors. Calls the
  triage     CVSS v3.1 impact per alert, incidents grouped by causal links
         │
         ▼
- report     TUI or plain output, agentguard-events.jsonl
+ report     TUI or plain output, agentguard-events.jsonl, HTML reports on exit
 ```
 
-Every call, whatever its score, is stored in the analyst's history so later reviews can see it.
+Only calls in the review range (0.1 to 0.8) are sent to the analyst LLM. Every other call is still recorded in the analyst's history database without an LLM call, so a later review can show it as context; signature alerts are recorded as confirmed findings.
 
 ## Installation
 
@@ -96,7 +96,7 @@ python main.py [-c CONFIG] [-p PATH] [-a AGENT_ROOT] [-s SERVER_CWD]
 | `-p`, `--path` | `corpus` | Directory of logs to watch (`adop-cyse/corpus/`) | required |
 | `-a`, `--agent-root` | `agent_root` | The agent's sandbox (`adop-cyse/testbed-repo/`) | required |
 | `-s`, `--server-cwd` | `server_cwd` | Working directory of the MCP server process | parent of `agent_root` |
-| `-m`, `--mirror-root` | `mirror_root` | Where mirrors, the event log and the history database go | `mirror/` in the AgentGuard directory |
+| `-m`, `--mirror-root` | `mirror_root` | Where mirrors, the event log, the history database and reports go | `mirror/` in the AgentGuard directory |
 | `--model` | `model` | Ollama model for the analyst (only `qwen2.5:7b` is pinned) | `qwen2.5:7b` |
 | `--plain` / `--no-plain` | `plain` | Plain line output instead of the TUI | off (plain is always used when stdout is not a terminal) |
 
@@ -173,7 +173,7 @@ From top to bottom:
 2. **Session tables.** The two most recently active sessions, one row per call: score, verdict, and provenance (`from 11` means the call carries content returned by seq 11). Runs of suppressed calls are collapsed into one row.
 3. **Footer.** Call counts and the latest system notice.
 
-Tamper alerts appear in red at the top of the incidents panel.
+The title bar shows each model with its digest (`qwen2.5:7b@845dbda0ea48`). Tamper alerts appear in red at the top of the incidents panel.
 
 ### Plain output
 
@@ -187,22 +187,36 @@ One line per event:
 
 A call can appear twice: first as `REVIEWING`, then again with the analyst's verdict. On exit, plain mode prints the ranked incidents:
 
-![Ranked incidents](images/plain.png)
+![Ranked incidents](media/images/plain.png)
+
+### HTML reports
+
+Every time AgentGuard exits, it rebuilds `reports/` in the mirror directory from the whole event log:
+- **`index.html`:** model digests, summary counts, every session with links to its page, the incidents ranked across all sessions, tamper events, and warnings and errors.
+- **One page per session:** that session's incidents in full (the root cause and every member call, with its verdict, impact and the reason for it, provenance, causal links, and the analyst's reasoning and evidence), followed by all of its calls.
+
+Old pages are removed first, so the directory always matches the event log. The pages contain no scripts and load nothing external, and every value from the log is escaped; session IDs are sanitized before they become file names. Print a page from the browser for a PDF. To rebuild the reports without running AgentGuard:
+
+```bash
+python -m agent_guard.report.html mirror/agentguard-events.jsonl          # writes mirror/reports/
+```
+
+Calls still waiting for the analyst when AgentGuard exits are shown as "still reviewing".
 
 ### Files in the mirror directory
 
 | File | Contents |
 |---|---|
 | `<corpus path>/*.jsonl` | Verified copy of every log line read |
-| `agentguard-events.jsonl` | Every AgentGuard event as JSON: call decisions, verdicts, impact, provenance, causal links, tamper and system notices |
+| `agentguard-events.jsonl` | Every AgentGuard event as JSON: call decisions, verdicts, impact, provenance, causal links, model digests, tamper and system notices |
 | `history.sqlite3` | The analyst's history: every call, its resources and embeddings, signature findings |
-| `reports/` | HTML reports, rebuilt from the event log every time AgentGuard exits: `index.html` and one page per session. Print a page from the browser for a PDF. |
+| `reports/` | HTML reports, rebuilt from the event log every time AgentGuard exits |
 
 ## Detection details
 
 ### Scoring
 
-Each call gets three confidences in [0, 1], combined with a noisy-OR: `score = 1 − (1 − prior)(1 − traversal)(1 − injection)`.
+Each call gets four confidences in [0, 1], combined with a noisy-OR: `score = 1 − (1 − prior)(1 − traversal)(1 − injection)(1 − forgery)`.
 
 | Tool | Prior |
 |---|---|
@@ -221,7 +235,7 @@ Calls that failed or were blocked are scored the same as successful ones, becaus
 
 ### Signatures
 
-Both signatures are binary (confidence 1.0 or 0.0), and each alert says exactly what matched.
+All three signatures are binary (confidence 1.0 or 0.0), and each alert says exactly what matched.
 
 **`path_traversal`** matches when any path argument resolves outside the sandbox, or cannot be resolved at all (for example, it contains a NUL byte).
 
@@ -310,7 +324,7 @@ The full tables are in `agent_guard/triage/impact.py`.
 
 ### Analyst
 
-The analyst (`qwen2.5:7b`, temperature 0, fixed seed) judges calls the signatures couldn't settle. It is told what the platform is for (routine engineering for a government contractor) and judges each call against that. It is never told what a task asked for.
+The analyst (`qwen2.5:7b`, temperature 0, fixed seed) is called only for calls scoring from 0.1 to 0.8. Signature alerts and suppressed calls never reach it as calls to judge; they appear only as context in later reviews. It is told what the platform is for (routine engineering for a government contractor) and judges each call against that. It is never told what a task asked for.
 
 Each review contains:
 - **Confirmed findings.** Earlier signature alerts, up to 20.
@@ -318,11 +332,25 @@ Each review contains:
 - **Related history.** Up to six earlier calls that touch the same resources or share content, found structurally and by embedding similarity. Earlier tasks appear only through shared resources.
 - **The call under review.**
 
-The analyst never sees `task_id`, `scenario_tag` or `annotations`. Log content is fenced off as data, and the prompt tells the model never to follow instructions inside it.
+The analyst never sees `task_id`, `scenario_tag` or `annotations`.
 
 A verdict names an OWASP Agentic category (ASI01–ASI06, ASI08, ASI10) and cites evidence. Citations of calls the analyst wasn't shown are dropped. The analyst's own verdicts are not stored as findings, so one wrong verdict can't reinforce the next.
 
-If Ollama is unreachable or returns no valid verdict after two attempts, the call is reported as **analyst failed** and treated as an alert. If the embedding model is unavailable, retrieval falls back to structural matching.
+If Ollama is unreachable or returns no valid verdict after two attempts, the call is reported as **analyst failed** and treated as an alert. If the embedding model is unavailable, retrieval falls back to structural matching. Every call, whatever its score, is embedded with `nomic-embed-text` when it is recorded, so similar calls can be found later.
+
+### Prompt-injection defenses
+
+Everything in a log record is attacker-influenced: the agent chooses arguments and targets, and fetched pages and memory supply results. Text the analyst reads can try to talk it out of an alert. AgentGuard defends in layers.
+
+**Guaranteed, and tested deterministically:**
+- **Recorded data can't change the prompt's structure.** Every recorded value is kept on one line: lookalike characters are normalized, and line breaks and other non-printing characters are escaped. Data can't forge a section header, a call, or text after the data block.
+- **The data block has an unpredictable boundary.** Recorded data is enclosed in `<log_data_CODE>` tags, where `CODE` is an HMAC of the session and seq under a key that exists only in AgentGuard's memory. Any other `log_data` tag inside the data is escaped, and the prompt tells the analyst that only the matching closing tag ends the data.
+- **A forged tag alerts before the analyst sees it** (the `fence_forgery` signature).
+- **The analyst's reach is limited.** It can cite only calls it was shown, it never sets impact, its evidence never merges incidents, its verdicts never become findings, and a call it fails to judge is reported as an alert.
+
+**Instructed, and measured:**
+- The prompt tells the analyst never to follow instructions in the data, and that text in the call under review that addresses the analyst, claims an approval, or dictates a verdict is itself an attack (an ASI01 alert).
+- How well a 7B model follows that is measured by `pytest -m analyst` (see [Testing](#testing)), not guaranteed. See [Limitations](#limitations) for the current results.
 
 ## Log integrity
 
@@ -354,23 +382,46 @@ pytest
 | `tool-priors.jsonl` | Every tool's prior and decision |
 | `provenance.jsonl` | Derived and context flags, task boundaries, function words |
 | `causality.jsonl` | Cross-task memory poisoning, planted files, overwrites and failed writes |
+| `fence-forgery.jsonl` | Forged analyst data tags in every encoding, and look-alikes that must not match |
 
 Expectations live in `tests/fixtures/make_fixtures.py`. Edit the cases there and regenerate; don't edit `expected_results.json` by hand.
+
+Other suites that need no model:
+- **`test_prompt_isolation.py`:**
+  - injection payloads in every attacker-influenced field must stay inside their field and the coded data block
+  - `task_id`, `scenario_tag` and `annotations` must never reach the prompt
+  - malformed verdicts are rejected, and an analyst that fails is reported as an alert
+- **`test_html_report.py`:** report ranking, per-session pages, escaping of hostile log content, and session IDs that can't escape the report directory.
+- **`test_models.py`:** model digest pinning.
+
+### Live analyst tests
+
+```bash
+pytest -m analyst
+```
+
+These run seven scenarios against the real analyst and are excluded from the default run. They need Ollama and the pinned `qwen2.5:7b`, and skip otherwise. Expect 15 to 25 minutes.
+
+Five scenarios are attacks where an injection tries to suppress an alert, and two are routine work where it tries to cause one. Each runs twice, once as a control without the payload and once with it:
+- The **injection test** checks that the payload doesn't change the verdict.
+- The **control test** checks that the control verdict is right. That's a detection question, kept separate so the two kinds of failure read differently.
+
+Treat these as a measurement of the model, not a pass/fail gate.
 
 ## Project layout
 
 ```
 agent_guard/
 ├── __main__.py      command line
-├── config.py        config files and defaults
+├── config.py        config files, defaults and model pins
 ├── pipeline.py      wires the stages together
 ├── core/            log records, AgentGuard's events, ASI categories
 ├── ingest/          file watching, mirroring, tamper detection
 ├── detect/          path resolution, tool priors, signatures, scoring
 ├── lineage/         token matching, provenance, causal links
 ├── triage/          CVSS impact, incident grouping and ranking
-├── analyst/         Ollama analyst, prompts, history store, session registry
-└── report/          event log, TUI and plain views
+├── analyst/         Ollama analyst, prompts, history store, session registry, model pinning
+└── report/          event log, TUI and plain views, HTML reports
 configs/             default.json, unit_test.json
 tests/               pytest suites; fixtures/ holds the static corpus and its generator
 ```
@@ -379,13 +430,19 @@ tests/               pytest suites; fixtures/ holds the static corpus and its ge
 
 ## Limitations
 
+- **The analyst's resistance to prompt injection is measured, not guaranteed.** On the pinned build with the current prompt, `pytest -m analyst` gave these results:
+  - A payload changed the verdict in 2 of the 7 scenarios. In one it suppressed an alert; in the other the injection attempt itself was caught and turned a missed attack into an alert.
+  - The analyst missed 2 of the 5 attacks even with no payload: credentials copied into memory, and an unvetted dependency committed.
+  - Small, unrelated prompt changes move these results in both directions. They describe this prompt on this model, not a property of AgentGuard.
+
+  The guarantees in [Prompt-injection defenses](#prompt-injection-defenses) don't depend on the model.
+- **The analyst is a 7B model.** Its verdicts guide triage but are not ground truth; signature alerts and impact ratings never depend on it.
 - **Instruction-following without content is not linked.** A call that follows instructions planted in a fetched page, without repeating any of its text, is not linked to the fetch. In the reference session, the `--output` injection (seq 12) follows the poisoned README (seq 11) but stays its own incident.
 - **Only the first 200 characters of each result are logged.** Content and instructions later in a long document cannot be traced.
 - **Links stay within a session.** ADOP memory persists across sessions, so poisoning that spans sessions isn't linked.
 - **Provenance and causal links are rebuilt only from logs read in the current run.** After a restart with a persistent mirror, links to earlier calls are lost. The analyst's history persists in `history.sqlite3`.
 - **Path resolution happens after the fact** (see [Path resolution](#path-resolution)).
 - **Signatures cover ADOP's git server.** Option positions are specific to how its tools build git's argv; another server needs its own entries in `detect/signatures.py`.
-- **The analyst is a 7B model.** Its verdicts guide triage but are not ground truth; signature alerts and impact ratings never depend on it.
 
 ## License
 
