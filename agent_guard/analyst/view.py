@@ -1,5 +1,5 @@
 """
-Here we define what the analyst agent gets to see. Essentially, we just 
+Here we define what the analyst agent gets to see. Essentially, we just
 strip the log of scenario_tag and annotations as well as task_id. This
 prevents data leakage.
 """
@@ -26,8 +26,14 @@ class AgentView:
     session_id: str
 
     @classmethod
-    def from_log_line(cls, line: LogLine, resolved_paths: tuple[ResolvedPath, ...]) -> "AgentView":
-        shared = {f: getattr(line, f) for f in cls.__dataclass_fields__ if f != "resolved_paths"}
+    def from_log_line(
+        cls, line: LogLine, resolved_paths: tuple[ResolvedPath, ...]
+    ) -> "AgentView":
+        shared = {
+            f: getattr(line, f)
+            for f in cls.__dataclass_fields__
+            if f != "resolved_paths"
+        }
         return cls(**shared, resolved_paths=tuple(resolved_paths))
 
 

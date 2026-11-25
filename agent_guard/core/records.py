@@ -9,7 +9,7 @@ from typing import Any
 
 
 class Status(Enum):
-    ERROR   = "error"
+    ERROR = "error"
     SUCCESS = "success"
     BLOCKED = "blocked"
 
@@ -41,6 +41,7 @@ class LogLine:
 @dataclass(frozen=True)
 class ResolvedPath:
     """Where a given path argument truly lands."""
+
     arg: str
     raw: str
     resolved: str | None

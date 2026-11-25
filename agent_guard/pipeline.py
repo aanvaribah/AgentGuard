@@ -28,10 +28,18 @@ def dispatch_finding(resolver: Resolver, log: LogLine) -> None:
     view = AgentView.from_log_line(log, a.resolved)
 
     if a.decision == "alert":
-        reporter.call(log, "alert", a.score, source="signature",
-                      label=", ".join(a.confidences.signatures()) or "combined score",
-                      evidence=[log.seq], reasoning="; ".join(a.details) or None, provenance=prov,
-                      impact=signature_impact(log, a), caused_by=links)
+        reporter.call(
+            log,
+            "alert",
+            a.score,
+            source="signature",
+            label=", ".join(a.confidences.signatures()) or "combined score",
+            evidence=[log.seq],
+            reasoning="; ".join(a.details) or None,
+            provenance=prov,
+            impact=signature_impact(log, a),
+            caused_by=links,
+        )
     elif a.decision == "review":
         reporter.call(log, "reviewing", a.score, provenance=prov, caused_by=links)
     else:

@@ -11,11 +11,19 @@ TOOL_RISK: dict[tuple[str, str], float] = {
     ("git", "git_init"): 0.2,
 }
 LOW_RISK_TOOLS = {
-    ("filesystem", "read_text_file"), ("filesystem", "list_directory"),
-    ("filesystem", "search_files"), ("filesystem", "get_file_info"),
-    ("git", "git_status"), ("git", "git_log"), ("git", "git_branch"),
-    ("git", "git_diff"), ("git", "git_show_worktree"), ("memory", "memory_get"),
-    ("memory", "memory_list"), ("fetch", "list_available_pages"), ("fetch", "fetch")
+    ("filesystem", "read_text_file"),
+    ("filesystem", "list_directory"),
+    ("filesystem", "search_files"),
+    ("filesystem", "get_file_info"),
+    ("git", "git_status"),
+    ("git", "git_log"),
+    ("git", "git_branch"),
+    ("git", "git_diff"),
+    ("git", "git_show_worktree"),
+    ("memory", "memory_get"),
+    ("memory", "memory_list"),
+    ("fetch", "list_available_pages"),
+    ("fetch", "fetch"),
 }
 LOW_RISK = 0.05
 UNKNOWN_TOOL_RISK = 0.3

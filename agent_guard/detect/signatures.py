@@ -34,7 +34,10 @@ def path_escape(resolved: tuple[ResolvedPath, ...]) -> tuple[float, str | None]:
         if r.resolved is None:
             return 1.0, f"{r.arg} {r.raw!r} is unresolvable"
         if not r.inside:
-            return 1.0, f"{r.arg} {r.raw!r} resolves to {r.resolved!r}, outside the sandbox"
+            return (
+                1.0,
+                f"{r.arg} {r.raw!r} resolves to {r.resolved!r}, outside the sandbox",
+            )
     return 0.0, None
 
 
@@ -63,7 +66,9 @@ def injected_option(fline: LogLine) -> str | None:
 def _argv_entries(value: Any, how: str) -> list[str]:
     """The argv entries the server builds from an argument. A list (which the server
     would reject) is still checked element by element, since an attempt counts."""
-    items = [str(v) for v in value] if isinstance(value, (list, tuple)) else [str(value)]
+    items = (
+        [str(v) for v in value] if isinstance(value, (list, tuple)) else [str(value)]
+    )
     if how == "split":
         return [tok for item in items for tok in item.split()]
     return items
@@ -73,7 +78,9 @@ def _known_option(tool_name: str, token: str) -> str | None:
     name = token.split("=", 1)[0]
     for known in KNOWN_OPTIONS.get(tool_name, {}):
         # git init accepts unambiguous abbreviations (--sep); git diff does not (--outp).
-        if name == known or (tool_name in ABBREVIATES and len(name) >= 3 and known.startswith(name)):
+        if name == known or (
+            tool_name in ABBREVIATES and len(name) >= 3 and known.startswith(name)
+        ):
             return known
     return None
 
@@ -90,7 +97,9 @@ def _find_option(fline: LogLine) -> tuple[str, str] | None:
     for arg, how, default in OPTION_POSITIONS.get((fline.server, fline.tool_name), ()):
         for tok in _argv_entries(fline.arguments.get(arg, default), how):
             if tok == "--":
-                return None  # git stops parsing options here; everything after is a path
+                return (
+                    None  # git stops parsing options here; everything after is a path
+                )
             if tok.startswith("-"):
                 return arg, tok
     return None

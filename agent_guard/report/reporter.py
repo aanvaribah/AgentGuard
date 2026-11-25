@@ -44,30 +44,69 @@ class Reporter:
     # Producers
     #
 
-    def call(self, log: LogLine, decision: Decision, score: float, *, source: str | None = None,
-             label: str | None = None, evidence=(), reasoning: str | None = None,
-             provenance: ProvenanceFlag | None = None, impact: Impact | None = None,
-             caused_by: Links = NO_LINKS) -> None:
-        self._emit(Event(
-            kind="call", time=_now(), level=Level.CRITICAL if decision in ("alert", "error") else Level.INFO,
-            session_id=log.session_id, seq=log.seq, tool=f"{log.server}.{log.tool_name}",
-            target=log.target_resource, decision=decision, source=source, score=round(score, 3),
-            label=label, evidence=list(evidence), reasoning=reasoning,
-            provenance=provenance.kind.value if provenance else None,
-            provenance_sources=list(provenance.sources) if provenance else [],
-            provenance_shared=list(provenance.shared) if provenance else [],
-            impact=round(impact.score, 3) if impact else None,
-            impact_vector=impact.vector if impact else None,
-            impact_basis=impact.basis if impact else None,
-            caused_by=list(caused_by.parents),
-            caused_by_reasons=list(caused_by.reasons),
-        ))
+    def call(
+        self,
+        log: LogLine,
+        decision: Decision,
+        score: float,
+        *,
+        source: str | None = None,
+        label: str | None = None,
+        evidence=(),
+        reasoning: str | None = None,
+        provenance: ProvenanceFlag | None = None,
+        impact: Impact | None = None,
+        caused_by: Links = NO_LINKS,
+    ) -> None:
+        self._emit(
+            Event(
+                kind="call",
+                time=_now(),
+                level=Level.CRITICAL if decision in ("alert", "error") else Level.INFO,
+                session_id=log.session_id,
+                seq=log.seq,
+                tool=f"{log.server}.{log.tool_name}",
+                target=log.target_resource,
+                decision=decision,
+                source=source,
+                score=round(score, 3),
+                label=label,
+                evidence=list(evidence),
+                reasoning=reasoning,
+                provenance=provenance.kind.value if provenance else None,
+                provenance_sources=list(provenance.sources) if provenance else [],
+                provenance_shared=list(provenance.shared) if provenance else [],
+                impact=round(impact.score, 3) if impact else None,
+                impact_vector=impact.vector if impact else None,
+                impact_basis=impact.basis if impact else None,
+                caused_by=list(caused_by.parents),
+                caused_by_reasons=list(caused_by.reasons),
+            )
+        )
 
     def integrity(self, path, message: str) -> None:
-        self._emit(Event(kind="integrity", time=_now(), level=Level.CRITICAL, target=str(path), message=message))
+        self._emit(
+            Event(
+                kind="integrity",
+                time=_now(),
+                level=Level.CRITICAL,
+                target=str(path),
+                message=message,
+            )
+        )
 
-    def system(self, level: Level | str, message: str, traceback: str | None = None) -> None:
-        self._emit(Event(kind="system", time=_now(), level=Level(level), message=message, traceback=traceback))
+    def system(
+        self, level: Level | str, message: str, traceback: str | None = None
+    ) -> None:
+        self._emit(
+            Event(
+                kind="system",
+                time=_now(),
+                level=Level(level),
+                message=message,
+                traceback=traceback,
+            )
+        )
 
     #
     # State (Dijkstra was so right)
@@ -93,9 +132,13 @@ class Reporter:
             if self._write_failed:
                 return None
             self._write_failed = True
-            return Event(kind="system", time=_now(), level=Level.CRITICAL,
-                         message=f"Event log write failed ({err}). Events are still "
-                                 f"shown but not recorded to {self._path}.")
+            return Event(
+                kind="system",
+                time=_now(),
+                level=Level.CRITICAL,
+                message=f"Event log write failed ({err}). Events are still "
+                f"shown but not recorded to {self._path}.",
+            )
         self._write_failed = False
         return None
 
@@ -107,26 +150,40 @@ class Reporter:
             self._notices.append(e)
             return
 
-        rows = self._sessions.setdefault(e.session_id, {}) # type: ignore
+        rows = self._sessions.setdefault(e.session_id, {})  # type: ignore
         self._tick += 1
-        self._activity[e.session_id] = self._tick # type: ignore
+        self._activity[e.session_id] = self._tick  # type: ignore
 
         # Provenance and causal links are decided once, by the pipeline, on a call's first
         # event; later verdict events for the same call don't repeat them, so they are
         # only set here.
         row = rows.get(e.seq) or rows.setdefault(  # type: ignore
-            e.seq, Row(e.seq, e.tool, e.target, e.score, e.decision,  # type: ignore
-                       provenance=e.provenance, provenance_sources=list(e.provenance_sources),
-                       caused_by=list(e.caused_by), first_seen=e.time)
+            e.seq,
+            Row(
+                e.seq,
+                e.tool,
+                e.target,
+                e.score,
+                e.decision,  # type: ignore
+                provenance=e.provenance,
+                provenance_sources=list(e.provenance_sources),
+                caused_by=list(e.caused_by),
+                first_seen=e.time,
+            ),
         )
-        row.decision, row.score, row.source, row.label = e.decision, e.score, e.source, e.label # type: ignore
+        row.decision, row.score, row.source, row.label = (
+            e.decision,
+            e.score,
+            e.source,
+            e.label,
+        )  # type: ignore
         row.evidence, row.reasoning = e.evidence, e.reasoning
         if e.impact is not None:
             row.impact, row.impact_vector = e.impact, e.impact_vector
         if e.decision == "alert":
             for s in e.evidence:
                 if s != e.seq and s in rows:
-                    rows[s].linked_by.add(e.seq) # type: ignore
+                    rows[s].linked_by.add(e.seq)  # type: ignore
 
     def snapshot(self) -> Snapshot:
         with self._lock:
@@ -164,5 +221,7 @@ class LibraryLogHandler(logging.Handler):
         except (TypeError, ValueError):
             self.handleError(record)
             return
-        trace = "".join(tb.format_exception(*record.exc_info)) if record.exc_info else None
+        trace = (
+            "".join(tb.format_exception(*record.exc_info)) if record.exc_info else None
+        )
         reporter.system(level, f"[{record.name}] {message}", traceback=trace)

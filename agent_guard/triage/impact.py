@@ -1,6 +1,6 @@
 """
 Alert ranking. We go by impact (CVSS 3.1 impact subscore) of what the alerting call
-either did or attempted to do. Incidents take the highest impact of any of their 
+either did or attempted to do. Incidents take the highest impact of any of their
 alerts (see triage/incidents.py).
 """
 
@@ -11,7 +11,7 @@ from agent_guard.detect.priors import LOW_RISK_TOOLS
 from agent_guard.detect.scoring import Assessment
 from agent_guard.detect.signatures import injected_option
 
-WEIGHT = {"N": 0.0, "L": 0.22, "H": 0.56}   # CVSS v3.1 C/I/A weights
+WEIGHT = {"N": 0.0, "L": 0.22, "H": 0.56}  # CVSS v3.1 C/I/A weights
 ORDER = "NLH"
 
 
@@ -20,8 +20,8 @@ class Impact:
     c: str
     i: str
     a: str
-    scope: str   # "U" (unchanged) or "C" (changed)
-    basis: str   # why this vector, in words
+    scope: str  # "U" (unchanged) or "C" (changed)
+    basis: str  # why this vector, in words
 
     @property
     def score(self) -> float:
@@ -45,7 +45,9 @@ def combine(*impacts: Impact) -> Impact:
     """Component-wise maximum: a call that does several things is rated by the worst."""
     pick = lambda vals: max(vals, key=ORDER.index)
     return Impact(
-        pick([x.c for x in impacts]), pick([x.i for x in impacts]), pick([x.a for x in impacts]),
+        pick([x.c for x in impacts]),
+        pick([x.i for x in impacts]),
+        pick([x.a for x in impacts]),
         "C" if any(x.scope == "C" for x in impacts) else "U",
         "; ".join(dict.fromkeys(x.basis for x in impacts)),
     )
@@ -54,6 +56,7 @@ def combine(*impacts: Impact) -> Impact:
 #
 # Tables
 #
+
 
 def action_class(server: str, tool_name: str) -> str:
     if (server, tool_name) in LOW_RISK_TOOLS:
@@ -80,7 +83,9 @@ BASE = {
 OUTSIDE = {
     "read": Impact("H", "N", "N", "C", "reads outside the sandbox"),
     "write": Impact("N", "H", "N", "C", "writes outside the sandbox"),
-    "git-write": Impact("N", "L", "N", "C", "creates or stages git data outside the sandbox"),
+    "git-write": Impact(
+        "N", "L", "N", "C", "creates or stages git data outside the sandbox"
+    ),
     "memory": Impact("N", "L", "N", "C", "writes to memory outside the sandbox"),
     "unknown": Impact("H", "H", "H", "C", "unknown tool acting outside the sandbox"),
 }
@@ -92,7 +97,9 @@ OPTIONS = {
     "--ext-diff": Impact("H", "H", "H", "C", "git runs an external program"),
     "--textconv": Impact("H", "H", "H", "C", "git runs configured conversion programs"),
     "--template": Impact("H", "H", "H", "C", "planted hooks run on later git commands"),
-    "--separate-git-dir": Impact("N", "L", "N", "C", "git data placed outside the repository"),
+    "--separate-git-dir": Impact(
+        "N", "L", "N", "C", "git data placed outside the repository"
+    ),
 }
 UNKNOWN_OPTION = Impact("L", "L", "N", "U", "git option with no known effect")
 
@@ -103,7 +110,9 @@ CATEGORY = {
     "ASI03": Impact("H", "N", "N", "U", "reaches resources the work does not need"),
     "ASI04": Impact("H", "H", "H", "C", "unvetted third-party code enters the build"),
     "ASI05": Impact("H", "H", "H", "C", "content written where it will execute"),
-    "ASI06": Impact("H", "H", "N", "C", "persists into memory that later sessions trust"),
+    "ASI06": Impact(
+        "H", "H", "N", "C", "persists into memory that later sessions trust"
+    ),
     "ASI08": Impact("N", "H", "N", "U", "builds on a confirmed problem"),
     "ASI10": Impact("H", "H", "L", "U", "sustained action against the operator"),
 }

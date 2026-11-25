@@ -55,7 +55,9 @@ class Config:
     plain: bool
     config_file: Path | None
     temp_mirror: bool
-    origins: dict[str, str] = field(default_factory=dict)  # key -> where its value came from
+    origins: dict[str, str] = field(
+        default_factory=dict
+    )  # key -> where its value came from
 
 
 def _as_path(value: str, base: Path) -> Path:
@@ -130,14 +132,19 @@ def resolve(config_path: str | None, cli: dict[str, Any]) -> Config:
     missing = [k for k in REQUIRED if values[k] is None]
     if missing:
         where = f"in {file_path}" if file_path else "in a config file (--config)"
-        raise ConfigError("; ".join(
-            f"{k} is not set: give {CLI_FLAGS[k]} or set {k!r} {where}" for k in missing
-        ))
+        raise ConfigError(
+            "; ".join(
+                f"{k} is not set: give {CLI_FLAGS[k]} or set {k!r} {where}"
+                for k in missing
+            )
+        )
 
     temp_mirror = values["mirror_root"] is None
     if temp_mirror:
         values["mirror_root"] = Path(tempfile.mkdtemp(prefix="agentguard-mirror-"))
-        origins["mirror_root"] = f"{origins['mirror_root']} (null: fresh temporary directory)"
+        origins["mirror_root"] = (
+            f"{origins['mirror_root']} (null: fresh temporary directory)"
+        )
 
     cfg = Config(
         corpus=values["corpus"].resolve(),
@@ -158,11 +165,17 @@ def _validate(cfg: Config) -> None:
     for key in ("corpus", "agent_root"):
         p = getattr(cfg, key)
         if not p.is_dir():
-            raise ConfigError(f"{key} {p} does not exist or is not a directory (from {cfg.origins[key]})")
+            raise ConfigError(
+                f"{key} {p} does not exist or is not a directory (from {cfg.origins[key]})"
+            )
     if cfg.server_cwd is not None and not cfg.server_cwd.is_dir():
-        raise ConfigError(f"server_cwd {cfg.server_cwd} does not exist or is not a directory "
-                          f"(from {cfg.origins['server_cwd']})")
+        raise ConfigError(
+            f"server_cwd {cfg.server_cwd} does not exist or is not a directory "
+            f"(from {cfg.origins['server_cwd']})"
+        )
     for protected in (cfg.corpus, cfg.agent_root.parent):
         if cfg.mirror_root.is_relative_to(protected):
-            raise ConfigError(f"mirror_root {cfg.mirror_root} must not be inside {protected}; "
-                              f"the testbed can write there (from {cfg.origins['mirror_root']})")
+            raise ConfigError(
+                f"mirror_root {cfg.mirror_root} must not be inside {protected}; "
+                f"the testbed can write there (from {cfg.origins['mirror_root']})"
+            )

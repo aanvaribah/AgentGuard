@@ -23,7 +23,9 @@ MAX_ATTEMPTS = 2
 MODEL_OPTIONS = {"temperature": 0, "seed": 587, "num_ctx": 8192}
 
 Decision = Literal["alert", "review", "suppress"]
-Category = Literal["NONE", "ASI01", "ASI02", "ASI03", "ASI04", "ASI05", "ASI06", "ASI08", "ASI10"]
+Category = Literal[
+    "NONE", "ASI01", "ASI02", "ASI03", "ASI04", "ASI05", "ASI06", "ASI08", "ASI10"
+]
 
 
 class AnalystError(Exception):
@@ -34,7 +36,9 @@ class Verdict(BaseModel):
     reasoning: str = Field(
         description="What the call does, whether it is on the golden path, and what the evidence shows."
     )
-    evidence_seqs: list[int] = Field(description="seq numbers of the calls that support the verdict.")
+    evidence_seqs: list[int] = Field(
+        description="seq numbers of the calls that support the verdict."
+    )
     category: Category
     alert: bool
 
@@ -58,7 +62,7 @@ class AgentSession:
         view: AgentView,
         task_id: str,
         confidences: Confidences,
-        decision: Decision
+        decision: Decision,
     ) -> Verdict | None:
         """Records every line, only reviews logs dispatched to the analyst. task_id is used
         to find the task instance, it is never provided as context."""
@@ -67,11 +71,24 @@ class AgentSession:
             await self.store.add(view, task_key, ordinal)
 
             if decision == "alert":
-                sigs = ", ".join(confidences.signatures()) or "combined deterministic score"
-                where = describe(view.resolved_paths) if view.resolved_paths else f"on {view.target_resource}"
-                self.store.add_finding(self.session_id, Finding(
-                    view.seq, "signature", sigs, f"{view.server}.{view.tool_name}: {where}"
-                ))
+                sigs = (
+                    ", ".join(confidences.signatures())
+                    or "combined deterministic score"
+                )
+                where = (
+                    describe(view.resolved_paths)
+                    if view.resolved_paths
+                    else f"on {view.target_resource}"
+                )
+                self.store.add_finding(
+                    self.session_id,
+                    Finding(
+                        view.seq,
+                        "signature",
+                        sigs,
+                        f"{view.server}.{view.tool_name}: {where}",
+                    ),
+                )
                 return None
             if decision == "suppress":
                 return None
@@ -79,15 +96,29 @@ class AgentSession:
             # Don't store the verdict as a finding, it leads to a feedback loop if you do
             return await self._evaluate(view, task_key, ordinal, confidences)
 
-    async def _evaluate(self, view: AgentView, task_key: str, ordinal: int, confidences: Confidences) -> Verdict:
+    async def _evaluate(
+        self, view: AgentView, task_key: str, ordinal: int, confidences: Confidences
+    ) -> Verdict:
         recent = self.store.recent(self.session_id, task_key, view.seq, RECENT_WINDOW)
-        related = self.store.related(view, task_key, {v.seq for v in recent} | {view.seq}, RELATED_K)
+        related = self.store.related(
+            view, task_key, {v.seq for v in recent} | {view.seq}, RELATED_K
+        )
         findings = self.store.findings(view, task_key, MAX_FINDINGS)
-        shown = {view.seq} | {v.seq for v in recent} | {v.seq for v, _ in related} | {f.seq for f, _ in findings}
+        shown = (
+            {view.seq}
+            | {v.seq for v in recent}
+            | {v.seq for v, _ in related}
+            | {f.seq for f, _ in findings}
+        )
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_review(findings, recent, related, view, ordinal, confidences)},
+            {
+                "role": "user",
+                "content": build_review(
+                    findings, recent, related, view, ordinal, confidences
+                ),
+            },
         ]
 
         error: Exception | None = None
@@ -105,7 +136,10 @@ class AgentSession:
                 error = e
                 messages += [
                     {"role": "assistant", "content": content},
-                    {"role": "user", "content": f"That response was invalid ({e.error_count()} errors). Reply again with JSON matching the schema."},
+                    {
+                        "role": "user",
+                        "content": f"That response was invalid ({e.error_count()} errors). Reply again with JSON matching the schema.",
+                    },
                 ]
         raise AnalystError(f"No valid verdict after {MAX_ATTEMPTS} attempts: {error}")
 

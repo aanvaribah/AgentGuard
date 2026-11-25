@@ -2,10 +2,10 @@
 Path resolution logic because the ADOP system is kind of annoying.
 So git_server runs the git_init call with cwd=".", which is the CWD of
 the MCP server process rather than PROJECT_ROOT. Every other tool uses
-PROJECT_ROOT, including ones that exist inside git_server (such as 
+PROJECT_ROOT, including ones that exist inside git_server (such as
 git_commit). This means we need to have a clear distinction of the resolved
 path and the written path, because otherwise the analyst agent doesn't
-understand that `git init .` is path traversal and `git commit .` is safe. 
+understand that `git init .` is path traversal and `git commit .` is safe.
 """
 
 import json
@@ -24,7 +24,11 @@ class Resolver:
         self.server_cwd = server_cwd.resolve()
 
     def base(self, server: str, tool_name: str) -> Path:
-        return self.server_cwd if (server, tool_name) == ("git", "git_init") else self.sandbox
+        return (
+            self.server_cwd
+            if (server, tool_name) == ("git", "git_init")
+            else self.sandbox
+        )
 
     def resolve(self, log: LogLine) -> tuple[ResolvedPath, ...]:
         base = self.base(log.server, log.tool_name)
@@ -34,7 +38,11 @@ class Resolver:
             # the argument-injection signature reports it instead.
             found = [(a, raw) for a, raw in found if not raw.startswith("-")]
         if (log.server, log.tool_name) == ("git", "git_diff"):
-            found += [("pathspec", t) for t in _tokens(log.arguments.get("pathspec", "")) if not t.startswith("-")]
+            found += [
+                ("pathspec", t)
+                for t in _tokens(log.arguments.get("pathspec", ""))
+                if not t.startswith("-")
+            ]
         return tuple(self._one(arg, raw, base) for arg, raw in found)
 
     def _one(self, arg: str, raw: str, base: Path) -> ResolvedPath:
@@ -66,5 +74,7 @@ def describe(resolved: tuple[ResolvedPath, ...]) -> str:
             parts.append(f"{r.arg} {json.dumps(r.raw)} -> unresolvable")
         else:
             where = "inside the repository" if r.inside else "OUTSIDE the repository"
-            parts.append(f"{r.arg} {json.dumps(r.raw)} -> {json.dumps(r.resolved)} ({where})")
+            parts.append(
+                f"{r.arg} {json.dumps(r.raw)} -> {json.dumps(r.resolved)} ({where})"
+            )
     return "; ".join(parts)

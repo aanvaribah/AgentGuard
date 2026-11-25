@@ -6,7 +6,7 @@ Causal links! We group alerts into incidents with a root cause. Two kinds of edg
        This works for both the same task and two tasks in the same session.
 
 The writer of a given resource is the most recent write_file or memory_set that
-succeeded. Edges stay within the same session, but ADOP has memory persist 
+succeeded. Edges stay within the same session, but ADOP has memory persist
 across sessions, which is just a limitation that we'll deal with.
 """
 
@@ -31,8 +31,11 @@ def _norm(p: str) -> str:
     return p.rstrip("/") or "."
 
 
-def resource_keys(arguments: dict[str, Any], target_resource: str,
-                  resolved_paths: tuple[ResolvedPath, ...]) -> set[str]:
+def resource_keys(
+    arguments: dict[str, Any],
+    target_resource: str,
+    resolved_paths: tuple[ResolvedPath, ...],
+) -> set[str]:
     """Identifiers for what a call touched: resolved paths, URLs, memory keys. Paths are
     compared by where they land, so git_init "." (the project root, "..") and git_add "."
     (the repository, ".") are not the same resource."""
@@ -49,8 +52,8 @@ def resource_keys(arguments: dict[str, Any], target_resource: str,
 
 @dataclass(frozen=True)
 class Links:
-    parents: tuple[int, ...]   # seqs of the calls this one follows from
-    reasons: tuple[str, ...]   # one explanation per parent, same order
+    parents: tuple[int, ...]  # seqs of the calls this one follows from
+    reasons: tuple[str, ...]  # one explanation per parent, same order
 
     def __bool__(self) -> bool:
         return bool(self.parents)
@@ -63,10 +66,16 @@ class CausalTracker:
     """Feed it every record of a session, in seq order."""
 
     def __init__(self) -> None:
-        self._writers: dict[str, dict[str, int]] = {}  # session -> resource key -> writer seq
+        self._writers: dict[
+            str, dict[str, int]
+        ] = {}  # session -> resource key -> writer seq
 
-    def observe(self, log: LogLine, resolved: tuple[ResolvedPath, ...],
-                provenance: ProvenanceFlag | None) -> Links:
+    def observe(
+        self,
+        log: LogLine,
+        resolved: tuple[ResolvedPath, ...],
+        provenance: ProvenanceFlag | None,
+    ) -> Links:
         writers = self._writers.setdefault(log.session_id, {})
         keys = resource_keys(log.arguments, log.target_resource, resolved)
         writes = (log.server, log.tool_name) in WRITERS

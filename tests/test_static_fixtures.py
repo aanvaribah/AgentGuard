@@ -28,24 +28,45 @@ AGENT_ROOT: Path = CONFIG["agent_root"]
 SERVER_CWD: Path = CONFIG.get("server_cwd") or AGENT_ROOT.parent
 
 SCHEMA_FIELDS = {
-    "timestamp", "session_id", "server", "tool_name", "arguments", "target_resource", "result_status",
-    "scenario_tag", "duration_ms", "result_summary", "task_id", "seq", "annotations",
+    "timestamp",
+    "session_id",
+    "server",
+    "tool_name",
+    "arguments",
+    "target_resource",
+    "result_status",
+    "scenario_tag",
+    "duration_ms",
+    "result_summary",
+    "task_id",
+    "seq",
+    "annotations",
 }
 FIXTURE_FILES = sorted(CORPUS.glob("*.jsonl"))
-EXPECTED = json.loads((CORPUS / "expected_results.json").read_text(encoding="utf-8"))["records"]
+EXPECTED = json.loads((CORPUS / "expected_results.json").read_text(encoding="utf-8"))[
+    "records"
+]
 RESOLVER = Resolver(AGENT_ROOT, SERVER_CWD)
 
 
 def _records(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 RECORDS = {(p.name, r["seq"]): r for p in FIXTURE_FILES for r in _records(p)}
 
 
 def test_corpus_is_present():
-    assert FIXTURE_FILES, f"no fixtures in {CORPUS}; run tests/fixtures/make_fixtures.py"
-    assert AGENT_ROOT.is_dir(), f"{AGENT_ROOT} must exist (commit tests/fixtures/testbed-repo/.gitkeep)"
+    assert FIXTURE_FILES, (
+        f"no fixtures in {CORPUS}; run tests/fixtures/make_fixtures.py"
+    )
+    assert AGENT_ROOT.is_dir(), (
+        f"{AGENT_ROOT} must exist (commit tests/fixtures/testbed-repo/.gitkeep)"
+    )
 
 
 def test_every_record_has_exactly_one_expectation():
@@ -60,7 +81,9 @@ def test_fixture_file_is_a_valid_single_session_log(path):
     assert {r["session_id"] for r in records} == {records[0]["session_id"]}
     assert [r["seq"] for r in records] == list(range(1, len(records) + 1))
     for r in records:
-        assert set(r) == SCHEMA_FIELDS, f"seq {r['seq']}: fields differ from the ADOP log schema"
+        assert set(r) == SCHEMA_FIELDS, (
+            f"seq {r['seq']}: fields differ from the ADOP log schema"
+        )
         LogLine.from_dict(dict(r))  # must parse the way AgentGuard parses live records
 
 
@@ -91,6 +114,10 @@ def test_provenance_and_causal_links(path):
         links = causes.observe(log, RESOLVER.resolve(log), flag)
         exp = expected[r["seq"]]
         why = f"{path.name} seq {r['seq']}: {exp['why']}"
-        got = None if flag is None else {"kind": flag.kind.value, "sources": list(flag.sources)}
+        got = (
+            None
+            if flag is None
+            else {"kind": flag.kind.value, "sources": list(flag.sources)}
+        )
         assert got == exp["provenance"], why
         assert list(links.parents) == exp["caused_by"], why

@@ -28,8 +28,13 @@ BANNER = r"""
 """
 
 
-def print_banner(watch_path: Path, agent_root: Path, mirror_root: Path, config_file: Path | None,
-                 models: list[ModelInfo]) -> None:
+def print_banner(
+    watch_path: Path,
+    agent_root: Path,
+    mirror_root: Path,
+    config_file: Path | None,
+    models: list[ModelInfo],
+) -> None:
     print(BANNER)
     print(f"  config   : {config_file or '(none, command line only)'}")
     print(f"  watching : {watch_path}")
@@ -55,47 +60,91 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="File watching and static analysis script.",
         epilog="Settings come from --config (default: configs/default.json); "
-               "any flag given here overrides the config file.",
+        "any flag given here overrides the config file.",
     )
-    parser.add_argument("-c", "--config", type=str, default=None,
-                        help="JSON config file (default: configs/default.json, if present).")
-    parser.add_argument("-p", "--path", type=str, default=None,
-                        help="Path to the directory you want to watch (typically adop-cyse/corpus/).")
-    parser.add_argument("-a", "--agent-root", type=str, default=None,
-                        help="Path to the agent root (typically adop-cyse/testbed-repo/).")
-    parser.add_argument("-s", "--server-cwd", type=str, default=None,
-                        help="Working directory of the MCP server process "
-                        "(defaults to parent of agent-root).")
-    parser.add_argument("-m", "--mirror-root", type=str, default=None,
-                        help="Directory for log mirrors, AG logs, and the RAG DB (default: mirror/ in the AgentGuard directory).")
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default=None,
+        help="JSON config file (default: configs/default.json, if present).",
+    )
+    parser.add_argument(
+        "-p",
+        "--path",
+        type=str,
+        default=None,
+        help="Path to the directory you want to watch (typically adop-cyse/corpus/).",
+    )
+    parser.add_argument(
+        "-a",
+        "--agent-root",
+        type=str,
+        default=None,
+        help="Path to the agent root (typically adop-cyse/testbed-repo/).",
+    )
+    parser.add_argument(
+        "-s",
+        "--server-cwd",
+        type=str,
+        default=None,
+        help="Working directory of the MCP server process "
+        "(defaults to parent of agent-root).",
+    )
+    parser.add_argument(
+        "-m",
+        "--mirror-root",
+        type=str,
+        default=None,
+        help="Directory for log mirrors, AG logs, and the RAG DB (default: mirror/ in the AgentGuard directory).",
+    )
     parser.add_argument("--model", default=None, help="Ollama model for the analyst.")
-    parser.add_argument("--plain", action=argparse.BooleanOptionalAction, default=None,
-                        help="Disable the TUI (--no-plain forces it on, overriding the config).")
+    parser.add_argument(
+        "--plain",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Disable the TUI (--no-plain forces it on, overriding the config).",
+    )
     args = parser.parse_args()
 
     try:
-        cfg = resolve(args.config, {
-            "corpus": args.path,
-            "agent_root": args.agent_root,
-            "server_cwd": args.server_cwd,
-            "mirror_root": args.mirror_root,
-            "model": args.model,
-            "plain": args.plain,
-        })
+        cfg = resolve(
+            args.config,
+            {
+                "corpus": args.path,
+                "agent_root": args.agent_root,
+                "server_cwd": args.server_cwd,
+                "mirror_root": args.mirror_root,
+                "model": args.model,
+                "plain": args.plain,
+            },
+        )
     except ConfigError as e:
         parser.error(str(e))
 
     models = inspect({"analyst": cfg.model, "embedding": EMBED_MODEL})
     plain = cfg.plain or not sys.stdout.isatty()
     labels = " · ".join(f"{m.role} {m.label}" for m in models)
-    view = PlainView(reporter) if plain else LiveView(reporter, watch=str(cfg.corpus), mirror=str(cfg.mirror_root), models=labels)
+    view = (
+        PlainView(reporter)
+        if plain
+        else LiveView(
+            reporter, watch=str(cfg.corpus), mirror=str(cfg.mirror_root), models=labels
+        )
+    )
     if plain:
-        print_banner(cfg.corpus, cfg.agent_root, cfg.mirror_root, cfg.config_file, models)
+        print_banner(
+            cfg.corpus, cfg.agent_root, cfg.mirror_root, cfg.config_file, models
+        )
 
-    logging.basicConfig(level=logging.WARNING, handlers=[LibraryLogHandler()], force=True)
+    logging.basicConfig(
+        level=logging.WARNING, handlers=[LibraryLogHandler()], force=True
+    )
 
     event_handler = AGEventHandler(
-        str(cfg.agent_root), str(cfg.corpus), str(cfg.mirror_root),
+        str(cfg.agent_root),
+        str(cfg.corpus),
+        str(cfg.mirror_root),
         str(cfg.server_cwd) if cfg.server_cwd else None,
     )
     report_models(models)

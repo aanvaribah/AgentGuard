@@ -1,9 +1,9 @@
 """
 Session history
 
-Every log line is stored as AgentView (no scenario_tag or annotations). Findings 
+Every log line is stored as AgentView (no scenario_tag or annotations). Findings
 that are established through signatures or the analyst are shown as well. Retrieval
-starts with shared resources and content from earlier results, and then goes to 
+starts with shared resources and content from earlier results, and then goes to
 semantic matching. Only signatured findings get kept to prevent feedback loops
 in the analyst agent. The DB lives in the root of the mirror directory.
 """
@@ -74,8 +74,14 @@ def _digest(*parts: object) -> str:
 
 def _view_to_json(v: AgentView) -> str:
     d = asdict(v)
-    d["result_status"] = v.result_status.value if isinstance(v.result_status, Status) else v.result_status
-    d["timestamp"] = v.timestamp.isoformat() if isinstance(v.timestamp, datetime) else v.timestamp
+    d["result_status"] = (
+        v.result_status.value
+        if isinstance(v.result_status, Status)
+        else v.result_status
+    )
+    d["timestamp"] = (
+        v.timestamp.isoformat() if isinstance(v.timestamp, datetime) else v.timestamp
+    )
     return json.dumps(d, ensure_ascii=False)
 
 
@@ -93,7 +99,9 @@ def _keys(v: AgentView) -> set[str]:
 
 def _embed_text(v: AgentView) -> str:
     args = " ".join(strings(v.arguments))
-    return f"{v.server}.{v.tool_name} {v.target_resource} {args} {v.result_summary}"[:EMBED_TEXT_LIMIT]
+    return f"{v.server}.{v.tool_name} {v.target_resource} {args} {v.result_summary}"[
+        :EMBED_TEXT_LIMIT
+    ]
 
 
 def _cos(a: list[float], b: list[float]) -> float:
@@ -112,7 +120,9 @@ def _unpack(blob: bytes | None) -> list[float] | None:
 
 
 class HistoryStore:
-    def __init__(self, db_path: Path, embed_model: str = EMBED_MODEL, client: Any = None):
+    def __init__(
+        self, db_path: Path, embed_model: str = EMBED_MODEL, client: Any = None
+    ):
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         self._db.executescript(SCHEMA)
         self._client = client or ollama.AsyncClient()
@@ -125,7 +135,12 @@ class HistoryStore:
         try:
             resp = await self._client.embed(model=self.embed_model, input=text)
             return list(resp.embeddings[0])
-        except (ollama.ResponseError, ollama.RequestError, ConnectionError, httpx.TransportError) as e:
+        except (
+            ollama.ResponseError,
+            ollama.RequestError,
+            ConnectionError,
+            httpx.TransportError,
+        ) as e:
             reporter.warning(
                 f"Embeddings unavailable ({type(e).__name__}: {e}); falling back to structural retrieval."
             )
@@ -135,17 +150,21 @@ class HistoryStore:
     def task_instance(self, session_id: str, task_id: str) -> tuple[str, int]:
         """Opaque key and ordinal for the task instance this call belongs to.
         Essentially, tracking tasks and sessions is a nightmare so we need to
-        make a bunch of hashes rather than referencing things by what already 
+        make a bunch of hashes rather than referencing things by what already
         ought to be a unique name."""
         current = _digest("task", session_id, task_id)
         row = self._db.execute(
-            "SELECT last_task, ordinal FROM sessions WHERE session_id = ?", (session_id,)
+            "SELECT last_task, ordinal FROM sessions WHERE session_id = ?",
+            (session_id,),
         ).fetchone()
         if row and row[0] == current:
             ordinal = row[1]
         else:
             ordinal = (row[1] if row else 0) + 1
-            self._db.execute("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?)", (session_id, current, ordinal))
+            self._db.execute(
+                "INSERT OR REPLACE INTO sessions VALUES (?, ?, ?)",
+                (session_id, current, ordinal),
+            )
             self._db.commit()
         return _digest("instance", session_id, task_id, ordinal), ordinal
 
@@ -154,7 +173,11 @@ class HistoryStore:
         self._db.execute(
             "INSERT OR REPLACE INTO calls VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                v.session_id, v.seq, task_key, task_ordinal, _view_to_json(v),
+                v.session_id,
+                v.seq,
+                task_key,
+                task_ordinal,
+                _view_to_json(v),
                 json.dumps(sorted(_keys(v))),
                 json.dumps(sorted(tokens(v.result_summary))),
                 array("f", emb).tobytes() if emb else None,
@@ -169,43 +192,53 @@ class HistoryStore:
         )
         self._db.commit()
 
-    def findings(self, v: AgentView, task_key: str, limit: int) -> list[tuple[Finding, bool]]:
-        """Findings from this task along with findings from earlier tasks 
+    def findings(
+        self, v: AgentView, task_key: str, limit: int
+    ) -> list[tuple[Finding, bool]]:
+        """Findings from this task along with findings from earlier tasks
         with a call that touched a resource this one also touches."""
         cur_keys = _keys(v)
         out: list[tuple[Finding, bool]] = []
         for seq, source, label, detail, f_task, keys in self._db.execute(
             "SELECT f.seq, f.source, f.label, f.detail, c.task_key, c.keys FROM findings f "
             "JOIN calls c ON c.session_id = f.session_id AND c.seq = f.seq "
-            "WHERE f.session_id = ? AND f.seq < ? ORDER BY f.seq", (v.session_id, v.seq),
+            "WHERE f.session_id = ? AND f.seq < ? ORDER BY f.seq",
+            (v.session_id, v.seq),
         ):
             earlier = f_task != task_key
             if not earlier or cur_keys & set(json.loads(keys)):
                 out.append((Finding(seq, source, label, detail), earlier))
         return out[-limit:]
 
-    def recent(self, session_id: str, task_key: str, before_seq: int, k: int) -> list[AgentView]:
+    def recent(
+        self, session_id: str, task_key: str, before_seq: int, k: int
+    ) -> list[AgentView]:
         rows = self._db.execute(
             "SELECT view FROM calls WHERE session_id = ? AND task_key = ? AND seq < ? "
-            "ORDER BY seq DESC LIMIT ?", (session_id, task_key, before_seq, k),
+            "ORDER BY seq DESC LIMIT ?",
+            (session_id, task_key, before_seq, k),
         ).fetchall()
         return [_view_from_json(r[0]) for r in reversed(rows)]
 
-    def related(self, v: AgentView, task_key: str, exclude: set[int], k: int) -> list[tuple[AgentView, bool]]:
+    def related(
+        self, v: AgentView, task_key: str, exclude: set[int], k: int
+    ) -> list[tuple[AgentView, bool]]:
         """Earlier calls are ranked by resource sharing, content flows,
         task, and embedding similarity within the same task. For earlier
         tasks, just shared resources."""
         cur_keys = _keys(v)
         cur_tokens = tokens(" ".join(strings(v.arguments)))
         row = self._db.execute(
-            "SELECT embedding FROM calls WHERE session_id = ? AND seq = ?", (v.session_id, v.seq)
+            "SELECT embedding FROM calls WHERE session_id = ? AND seq = ?",
+            (v.session_id, v.seq),
         ).fetchone()
         cur_emb = _unpack(row[0]) if row else None
 
         scored: list[tuple[float, AgentView, bool]] = []
         for view_json, past_task, keys, result_tokens, blob in self._db.execute(
             "SELECT view, task_key, keys, result_tokens, embedding FROM calls "
-            "WHERE session_id = ? AND seq < ? ORDER BY seq", (v.session_id, v.seq),
+            "WHERE session_id = ? AND seq < ? ORDER BY seq",
+            (v.session_id, v.seq),
         ):
             past = _view_from_json(view_json)
             if past.seq in exclude:

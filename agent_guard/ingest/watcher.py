@@ -66,12 +66,20 @@ def _last_line(f, size: int) -> tuple[int, bytes]:
 
 
 class AGEventHandler(FileSystemEventHandler):
-    def __init__(self, allowed_path: str, watch_root: str, mirror_root: str, server_cwd: str | None = None):
+    def __init__(
+        self,
+        allowed_path: str,
+        watch_root: str,
+        mirror_root: str,
+        server_cwd: str | None = None,
+    ):
         super().__init__()
         self.allowed_path = Path(allowed_path).resolve()
         self.watch_root = Path(watch_root).resolve()
         self.mirror_root = Path(mirror_root).resolve()
-        self.server_cwd = Path(server_cwd).resolve() if server_cwd else self.allowed_path.parent
+        self.server_cwd = (
+            Path(server_cwd).resolve() if server_cwd else self.allowed_path.parent
+        )
         self.files: dict[Path, TrackedFile] = {}
         self.mirror_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.resolver = Resolver(self.allowed_path, self.server_cwd)
@@ -102,7 +110,10 @@ class AGEventHandler(FileSystemEventHandler):
 
     @staticmethod
     def _report_tampering(fpath: Path, st: TrackedFile, how: str) -> None:
-        reporter.integrity(fpath, f"{how}; last verified copy: {st.mirror}. Stop the agent and review the session.")
+        reporter.integrity(
+            fpath,
+            f"{how}; last verified copy: {st.mirror}. Stop the agent and review the session.",
+        )
 
     def read_file(self, fpath: Path) -> list[LogLine]:
         """Mirrors and returns all new complete lines."""
@@ -157,7 +168,7 @@ class AGEventHandler(FileSystemEventHandler):
                     self._report_tampering(
                         fpath,
                         st,
-                        "differs from its mirror (modified while AgentGuard was offline)"
+                        "differs from its mirror (modified while AgentGuard was offline)",
                     )
                     self._rebaseline(src, st, os.fstat(src.fileno()).st_size)
                     return
@@ -184,7 +195,10 @@ class AGEventHandler(FileSystemEventHandler):
     def on_moved(self, event):
         if not isinstance(event, FileMovedEvent):
             return
-        src, dest = Path(str(event.src_path)).resolve(), Path(str(event.dest_path)).resolve()
+        src, dest = (
+            Path(str(event.src_path)).resolve(),
+            Path(str(event.dest_path)).resolve(),
+        )
         if src in self.files:
             self._report_tampering(src, self.files.pop(src), f"was moved to {dest}")
         if self._is_log(dest):

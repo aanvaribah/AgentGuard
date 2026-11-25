@@ -19,7 +19,7 @@ from agent_guard.detect.priors import LOW_RISK_TOOLS
 from agent_guard.lineage.tokens import flowed, strings, tokens
 
 UNTRUSTED_SOURCES = frozenset({("fetch", "fetch"), ("memory", "memory_get")})
-MAX_SOURCES = 20        # untrusted results remembered per task instance
+MAX_SOURCES = 20  # untrusted results remembered per task instance
 MAX_SHARED_SHOWN = 5
 
 
@@ -31,8 +31,10 @@ class Provenance(StrEnum):
 @dataclass(frozen=True)
 class ProvenanceFlag:
     kind: Provenance
-    sources: tuple[int, ...]   # seqs of the untrusted calls (DERIVED: the ones content came from)
-    shared: tuple[str, ...]    # a few shared tokens, to explain a DERIVED flag
+    sources: tuple[
+        int, ...
+    ]  # seqs of the untrusted calls (DERIVED: the ones content came from)
+    shared: tuple[str, ...]  # a few shared tokens, to explain a DERIVED flag
 
     def describe(self) -> str:
         seqs = ", ".join(map(str, self.sources))
@@ -78,12 +80,20 @@ class ProvenanceTracker:
             derived = [(s, shared) for s, shared in derived if flowed(shared)]
             if derived:
                 shared = sorted(set().union(*(sh for _, sh in derived)))
-                flag = ProvenanceFlag(Provenance.DERIVED, tuple(s.seq for s, _ in derived),
-                                      tuple(shared[:MAX_SHARED_SHOWN]))
+                flag = ProvenanceFlag(
+                    Provenance.DERIVED,
+                    tuple(s.seq for s, _ in derived),
+                    tuple(shared[:MAX_SHARED_SHOWN]),
+                )
             else:
-                flag = ProvenanceFlag(Provenance.CONTEXT, tuple(s.seq for s in task.sources), ())
+                flag = ProvenanceFlag(
+                    Provenance.CONTEXT, tuple(s.seq for s in task.sources), ()
+                )
 
-        if (log.server, log.tool_name) in UNTRUSTED_SOURCES and log.result_status == Status.SUCCESS:
+        if (
+            log.server,
+            log.tool_name,
+        ) in UNTRUSTED_SOURCES and log.result_status == Status.SUCCESS:
             task.sources.append(_Source(log.seq, tokens(log.result_summary)))
             del task.sources[:-MAX_SOURCES]
 

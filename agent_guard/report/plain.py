@@ -18,6 +18,7 @@ from agent_guard.triage.incidents import ranked
 
 class PlainView:
     """One line per event and fixed columns, then the ranked incidents on exit."""
+
     def __init__(self, source: "Reporter | None" = None):
         self.source = source
         self._closed = False
@@ -41,10 +42,14 @@ class PlainView:
             rows = snap.sessions[sid]
             top, root = rows[inc.top], rows[inc.root]
             count = f" ({len(inc.alerts)} alerts)" if len(inc.alerts) > 1 else ""
-            lines.append(f"{n:>3}. {impact_text(top.impact, top.impact_vector):<30}  {short(sid):<14}  "
-                         f"{members_text(inc, '->'):<20}  {verdict_label(top)}{count}")
+            lines.append(
+                f"{n:>3}. {impact_text(top.impact, top.impact_vector):<30}  {short(sid):<14}  "
+                f"{members_text(inc, '->'):<20}  {verdict_label(top)}{count}"
+            )
             if inc.root != inc.top:
-                lines.append(f"{'':<5}root cause: seq {root.seq} {root.tool} {clip(root.target, 60)}")
+                lines.append(
+                    f"{'':<5}root cause: seq {root.seq} {root.tool} {clip(root.target, 60)}"
+                )
         for e in snap.integrity:
             lines.append(f"     TAMPER  {clean(e.target)}: {clean(e.message)}")
         return "\n".join(lines)
@@ -65,17 +70,17 @@ class PlainView:
         if e.kind == "system":
             return f"{t}  {e.level.name.upper():<14}  {clean(e.message)}"
 
-        head = f"{t}  {short(e.session_id):<14}  seq {e.seq:>4}  {clip(e.tool, 26):<26}  {e.decision.upper():<10}" #type: ignore
+        head = f"{t}  {short(e.session_id):<14}  seq {e.seq:>4}  {clip(e.tool, 26):<26}  {e.decision.upper():<10}"  # type: ignore
         impact = impact_text(e.impact, e.impact_vector)
         if e.decision == "alert" and e.source == "signature":
             tail = f"{verdict_label(e)}  {impact}  {clip(e.reasoning or 'target ' + str(e.target), 100)}"
         elif e.decision == "alert":
             evidence = ",".join(map(str, e.evidence)) or "-"
-            tail = f"{verdict_label(e)}  {impact}  evidence {evidence}  \"{clip(e.reasoning or '', 160)}\""
+            tail = f'{verdict_label(e)}  {impact}  evidence {evidence}  "{clip(e.reasoning or "", 160)}"'
         elif e.decision == "error":
             tail = f"treated as alert, {impact}: {clip(e.reasoning or '', 160)}"
         elif e.decision == "cleared":
-            tail = f"score {e.score:.2f}  \"{clip(e.reasoning or '', 120)}\""
+            tail = f'score {e.score:.2f}  "{clip(e.reasoning or "", 120)}"'
         else:
             tail = f"score {e.score:.2f}  target {clip(e.target, 60)}"
         if e.provenance:

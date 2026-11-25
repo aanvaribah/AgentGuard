@@ -16,7 +16,7 @@ from agent_guard.detect.signatures import argument_injection, path_escape
 
 Route = Literal["alert", "review", "suppress"]
 
-ALERT_THRESH = 0.8   # alert when the overall score is ABOVE this
+ALERT_THRESH = 0.8  # alert when the overall score is ABOVE this
 REVIEW_THRESH = 0.1  # send to the analyst when the score is at least this
 
 
@@ -34,13 +34,17 @@ class Confidences:
             if not (0.0 <= v <= 1.0):
                 raise ValueError(f"{clsfield.name} must be in [0,1], got {v}")
 
-            product *= (1 - float(getattr(self, clsfield.name)))
+            product *= 1 - float(getattr(self, clsfield.name))
 
         return 1 - product
 
     def signatures(self) -> list[str]:
         """Names of the signature checks"""
-        return [f.name for f in fields(self) if f.name != "tool_risk" and getattr(self, f.name) >= 0.5]
+        return [
+            f.name
+            for f in fields(self)
+            if f.name != "tool_risk" and getattr(self, f.name) >= 0.5
+        ]
 
 
 @dataclass(frozen=True)

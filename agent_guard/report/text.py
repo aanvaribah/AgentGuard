@@ -9,7 +9,9 @@ from agent_guard.triage.incidents import Incident
 
 def clean(s: object) -> str:
     """Log fields are attacker-influenced: no control characters (terminal escapes) reach the screen."""
-    return "".join(ch if ch.isprintable() else "\ufffd" for ch in " ".join(str(s).split()))
+    return "".join(
+        ch if ch.isprintable() else "\ufffd" for ch in " ".join(str(s).split())
+    )
 
 
 def clip(s: object, n: int) -> str:
@@ -18,11 +20,15 @@ def clip(s: object, n: int) -> str:
 
 
 def short(session_id: str, width: int = 14) -> str:
-    return session_id if len(session_id) <= width else "…" + session_id[-(width - 1):]
+    return session_id if len(session_id) <= width else "…" + session_id[-(width - 1) :]
 
 
 def category_label(category: str | None) -> str:
-    return f"{category} {CATEGORIES[category]}" if category in CATEGORIES else "uncategorized"
+    return (
+        f"{category} {CATEGORIES[category]}"
+        if category in CATEGORIES
+        else "uncategorized"
+    )
 
 
 def provenance_text(kind: str, sources: list[int], shared: list[str]) -> str:

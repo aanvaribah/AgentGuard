@@ -26,13 +26,13 @@ class Event:
     tool: str | None = None
     target: str | None = None
     decision: Decision | None = None
-    source: str | None = None   # signature or analyst
+    source: str | None = None  # signature or analyst
     score: float | None = None
-    label: str | None = None    # signature names or analyst category
+    label: str | None = None  # signature names or analyst category
     evidence: list[int] = field(default_factory=list)
     reasoning: str | None = None
     message: str | None = None
-    traceback: str | None = None # used for internal errors
+    traceback: str | None = None  # used for internal errors
     provenance: str | None = None
     provenance_sources: list[int] = field(default_factory=list)
     provenance_shared: list[str] = field(default_factory=list)
@@ -66,6 +66,6 @@ class Row:
 @dataclass
 class Snapshot:
     sessions: dict[str, dict[int, Row]]
-    order: list[str]    # session ids, least recently active first
+    order: list[str]  # session ids, least recently active first
     integrity: list[Event]
     notices: list[Event]
