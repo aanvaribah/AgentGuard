@@ -1,7 +1,8 @@
 """
 Deterministic checks of AgentGuard's scoring against the static corpus in
-tests/unit_tests/: tool priors, signatures, scores and the alert/review/suppress
-decision for every record. No Ollama, threads or file watching involved.
+tests/unit_tests/: tool priors, signatures, scores, the alert/review/suppress
+decision, the provenance flag and the impact vector of every signature alert.
+No Ollama, threads or file watching involved.
 
 The corpus location comes from configs/unit_test.json, the same config used to run
 AgentGuard itself over this corpus (python main.py -c configs/unit_test.json).
@@ -16,6 +17,7 @@ from agent_guard.config import load_file
 from agent_guard.models import LogLine
 from agent_guard.paths import Resolver
 from agent_guard.provenance import ProvenanceTracker
+from agent_guard.ranking import signature_impact
 from agent_guard.scoring import assess
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -71,6 +73,10 @@ def test_expected_result(exp):
     assert a.score == pytest.approx(exp["score"]), why
     if exp["detail_contains"]:
         assert exp["detail_contains"] in "; ".join(a.details), why
+    if a.decision == "alert":
+        assert signature_impact(log, a).vector == exp["impact"], why
+    else:
+        assert exp["impact"] is None, f"{why}: only alerts are rated"
 
 
 @pytest.mark.parametrize("path", FIXTURE_FILES, ids=lambda p: p.name)

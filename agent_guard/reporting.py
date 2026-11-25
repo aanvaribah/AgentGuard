@@ -29,6 +29,7 @@ from rich.text import Text
 from agent_guard.agent.prompts import CATEGORIES
 from agent_guard.models import Decision, Event, Incident, Level, LogLine, Row, Snapshot
 from agent_guard.provenance import ProvenanceFlag
+from agent_guard.ranking import Impact, rank_key
 
 
 def _now() -> str:
@@ -90,7 +91,7 @@ class Reporter:
 
     def call(self, log: LogLine, decision: Decision, score: float, *, source: str | None = None,
              label: str | None = None, evidence=(), reasoning: str | None = None,
-             provenance: ProvenanceFlag | None = None) -> None:
+             provenance: ProvenanceFlag | None = None, impact: Impact | None = None) -> None:
         self._emit(Event(
             kind="call", time=_now(), level=Level.CRITICAL if decision in ("alert", "error") else Level.INFO,
             session_id=log.session_id, seq=log.seq, tool=f"{log.server}.{log.tool_name}",
@@ -99,6 +100,9 @@ class Reporter:
             provenance=provenance.kind.value if provenance else None,
             provenance_sources=list(provenance.sources) if provenance else [],
             provenance_shared=list(provenance.shared) if provenance else [],
+            impact=round(impact.score, 3) if impact else None,
+            impact_vector=impact.vector if impact else None,
+            impact_basis=impact.basis if impact else None,
         ))
 
     def integrity(self, path, message: str) -> None:
@@ -157,6 +161,8 @@ class Reporter:
         )
         row.decision, row.score, row.source, row.label = e.decision, e.score, e.source, e.label # type: ignore
         row.evidence, row.reasoning = e.evidence, e.reasoning
+        if e.impact is not None:
+            row.impact, row.impact_vector = e.impact, e.impact_vector
         if e.decision == "alert":
             for s in e.evidence:
                 if s != e.seq and s in rows:
@@ -202,6 +208,21 @@ class LibraryLogHandler(logging.Handler):
         reporter.system(level, f"[{record.name}] {message}", traceback=trace)
 
 
+def ranked(snap: Snapshot) -> list[tuple[str, Incident]]:
+    """Every incident across sessions, highest impact first (see ranking.rank_key)."""
+    found = [(sid, inc) for sid in snap.order for inc in incidents(snap.sessions[sid])]
+
+    def key(item: tuple[str, Incident]) -> tuple:
+        r = snap.sessions[item[0]][item[1].seq]
+        return rank_key(r.impact, r.provenance, r.source, r.seq)
+
+    return sorted(found, key=key)
+
+
+def _impact_text(score: float | None, vector: str | None) -> str:
+    return f"impact {score:.1f} {vector}" if score is not None else "impact n/a"
+
+
 def incidents(rows: dict[int, Row]) -> list[Incident]:
     out = []
     for r in sorted(rows.values(), key=lambda r: r.seq):
@@ -220,15 +241,34 @@ def incidents(rows: dict[int, Row]) -> list[Incident]:
 
 
 class PlainView:
-    """One line per event and fixed columns."""
-    def __init__(self):
+    """One line per event and fixed columns, then the ranked alerts on exit."""
+    def __init__(self, source: "Reporter | None" = None):
+        self.source = source
         self._closed = False
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
+        if self.source is not None and not self._closed:
+            try:
+                print(self.summary(self.source.snapshot()), flush=True)
+            except BrokenPipeError:
+                pass
         return False
+
+    @staticmethod
+    def summary(snap: Snapshot) -> str:
+        found = ranked(snap)
+        lines = ["", f"Ranked alerts ({len(found)})"]
+        for n, (sid, inc) in enumerate(found, start=1):
+            r = snap.sessions[sid][inc.seq]
+            chain = " -> ".join(map(str, inc.chain))
+            lines.append(f"{n:>3}. {_impact_text(r.impact, r.impact_vector):<30}  {_short(sid):<14}  "
+                         f"seq {chain:<16}  {verdict_label(r)}")
+        for e in snap.integrity:
+            lines.append(f"     TAMPER  {_clean(e.target)}: {_clean(e.message)}")
+        return "\n".join(lines)
 
     def on_event(self, e: Event) -> None:
         if self._closed:
@@ -247,13 +287,14 @@ class PlainView:
             return f"{t}  {e.level.name.upper():<14}  {_clean(e.message)}"
 
         head = f"{t}  {_short(e.session_id):<14}  seq {e.seq:>4}  {_clip(e.tool, 26):<26}  {e.decision.upper():<10}" #type: ignore
+        impact = _impact_text(e.impact, e.impact_vector)
         if e.decision == "alert" and e.source == "signature":
-            tail = f"{verdict_label(e)}  {_clip(e.reasoning or 'target ' + str(e.target), 100)}"
+            tail = f"{verdict_label(e)}  {impact}  {_clip(e.reasoning or 'target ' + str(e.target), 100)}"
         elif e.decision == "alert":
             evidence = ",".join(map(str, e.evidence)) or "-"
-            tail = f"{verdict_label(e)}  evidence {evidence}  \"{_clip(e.reasoning or '', 160)}\""
+            tail = f"{verdict_label(e)}  {impact}  evidence {evidence}  \"{_clip(e.reasoning or '', 160)}\""
         elif e.decision == "error":
-            tail = f"treated as alert: {_clip(e.reasoning or '', 160)}"
+            tail = f"treated as alert, {impact}: {_clip(e.reasoning or '', 160)}"
         elif e.decision == "cleared":
             tail = f"score {e.score:.2f}  \"{_clip(e.reasoning or '', 120)}\""
         else:
@@ -292,7 +333,7 @@ class LiveView:
 
     def render(self) -> Panel:
         snap = self.source.snapshot()
-        found = [(sid, chain) for sid in snap.order for chain in incidents(snap.sessions[sid])]
+        found = ranked(snap)
         body = [self._alerts(snap, found)]
         for sid in reversed(snap.order[-self.max_sessions:]):
             body.append(self._session(sid, snap.sessions[sid])) # type: ignore
@@ -315,28 +356,30 @@ class LiveView:
                 (f"{e.time[11:19]}  {_clean(e.target)}: {_clean(e.message)}", "red"),
             ))
 
-        shown = found[-self.max_incidents:]
-        if len(found) > len(shown):
-            grid.add_row(Text(f"… {len(found) - len(shown)} earlier incidents", style="dim"))
+        shown = found[:self.max_incidents]  # highest impact first
 
-        for sid, inc in shown:
+        for n, (sid, inc) in enumerate(shown, start=1):
             r = snap.sessions[sid][inc.seq]
             chain_text = " → ".join(map(str, inc.chain))
+            impact = f"{r.impact:.1f}" if r.impact is not None else " n/a"
             line = Text.assemble(
-                ("■ ", "bold red"), (f"{_short(sid)}  ", "dim"),
-                (f"seq {chain_text}", "bold"), "   ", (verdict_label(r), "red"),
+                (f"{n:>2}. ", "bold"), (f"{impact:>4} ", "bold red"), (f"{r.impact_vector or '':<20} ", "red"),
+                (f"{_short(sid)}  ", "dim"), (f"seq {chain_text}", "bold"), "   ", (verdict_label(r), "red"),
             )
             if inc.cites:
                 line.append(f"   cites {', '.join(map(str, inc.cites))}", style="dim red")
             grid.add_row(line)
 
             detail = _clip(r.reasoning, 100) if r.reasoning else f"→ {_clip(r.target, 70)}"
-            grid.add_row(Text(f"   {r.tool}: {detail}", style="dim"))
+            grid.add_row(Text(f"    {r.tool}: {detail}", style="dim"))
+
+        if len(found) > len(shown):
+            grid.add_row(Text(f"… {len(found) - len(shown)} lower-ranked incidents", style="dim"))
 
         alerting = bool(snap.integrity or found)
         return Panel(
             grid if alerting else Text("No alerts", style="green"),
-            title="Alerts", title_align="left", box=box.SQUARE,
+            title="Alerts, ranked by CVSS v3.1 impact", title_align="left", box=box.SQUARE,
             border_style="red" if alerting else "green",
         )
 

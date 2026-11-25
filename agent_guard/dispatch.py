@@ -7,6 +7,7 @@ other evidence. Scoring itself lives in scoring.py.
 from agent_guard.models import AgentView, LogLine
 from agent_guard.paths import Resolver
 from agent_guard.provenance import ProvenanceTracker
+from agent_guard.ranking import signature_impact
 from agent_guard.registry import registry
 from agent_guard.reporting import reporter
 from agent_guard.scoring import assess
@@ -25,7 +26,8 @@ def dispatch_finding(resolver: Resolver, log: LogLine) -> None:
     if a.decision == "alert":
         reporter.call(log, "alert", a.score, source="signature",
                       label=", ".join(a.confidences.signatures()) or "combined score",
-                      evidence=[log.seq], reasoning="; ".join(a.details) or None, provenance=prov)
+                      evidence=[log.seq], reasoning="; ".join(a.details) or None, provenance=prov,
+                      impact=signature_impact(log, a))
     elif a.decision == "review":
         reporter.call(log, "reviewing", a.score, provenance=prov)
     else:

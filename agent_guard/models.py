@@ -174,6 +174,9 @@ class Event:
     provenance: str | None = None
     provenance_sources: list[int] = field(default_factory=list)
     provenance_shared: list[str] = field(default_factory=list)
+    impact: float | None = None
+    impact_vector: str | None = None
+    impact_basis: str | None = None
 
 
 @dataclass
@@ -190,6 +193,8 @@ class Row:
     linked_by: set[int] = field(default_factory=set)
     provenance: str | None = None
     provenance_sources: list[int] = field(default_factory=list)
+    impact: float | None = None
+    impact_vector: str | None = None
 
 
 @dataclass

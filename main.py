@@ -66,7 +66,7 @@ if __name__ == "__main__":
         parser.error(str(e))
 
     plain = cfg.plain or not sys.stdout.isatty()
-    view = PlainView() if plain else LiveView(reporter, watch=str(cfg.corpus), mirror=str(cfg.mirror_root), model=cfg.model)
+    view = PlainView(reporter) if plain else LiveView(reporter, watch=str(cfg.corpus), mirror=str(cfg.mirror_root), model=cfg.model)
     if plain:
         print_banner(cfg.corpus, cfg.agent_root, cfg.mirror_root, cfg.config_file)
 

@@ -29,15 +29,16 @@ ESCAPE_ERROR = 'Error executing tool {tool}: Path "{path}" resolves outside the 
 
 
 def case(tool, args, *, decision, score, signatures=(), detail=None, why, status="success",
-         summary="ok", target=None, truth="clean", tags=(), task=None, provenance=None):
-    """provenance: None, or (kind, [source seqs]) as ProvenanceTracker should report it."""
+         summary="ok", target=None, truth="clean", tags=(), task=None, provenance=None, impact=None):
+    """provenance: None, or (kind, [source seqs]) as ProvenanceTracker should report it.
+    impact: the CVSS vector ranking.signature_impact should give a signature alert."""
     server, tool_name = tool.split(".")
     return {
         "server": server, "tool_name": tool_name, "arguments": args, "result_status": status,
         "result_summary": summary, "target_resource": target or _target(server, tool_name, args),
         "scenario_tag": truth, "annotations": list(tags), "task": task,
         "expect": {"decision": decision, "score": score, "signatures": sorted(signatures),
-                   "detail_contains": detail, "provenance": _prov(provenance), "why": why},
+                   "detail_contains": detail, "provenance": _prov(provenance), "impact": impact, "why": why},
     }
 
 
@@ -58,35 +59,35 @@ ARGUMENT_INJECTION = [
     # Option tokens in an injectable position (git_diff ref/pathspec, git_init target_path).
     case("git.git_diff", {"ref": "HEAD", "pathspec": "--output=../data/exfiltrated-diff.txt ."},
          decision="alert", score=SIG, signatures=["argument_injection"], detail="git option --output",
-         why="reference payload: --output in pathspec", truth="poisoned", tags=["argument_injection"]),
+         why="reference payload: --output in pathspec", impact="C:N/I:H/A:L/S:C", truth="poisoned", tags=["argument_injection"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": ". --output ../x"},
          decision="alert", score=SIG, signatures=["argument_injection", "path_traversal"], detail="git option --output",
-         why="--output as its own token after a path; its value ../x is also read as a path outside the sandbox",
+         why="--output as its own token after a path; its value ../x is also read as a path outside the sandbox", impact="C:H/I:H/A:L/S:C",
          truth="poisoned", tags=["argument_injection"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": "--outp=../x"}, status="error", summary="usage: git diff [<options>] [<commit>] [--] [<path>...]",
          decision="alert", score=SIG, signatures=["argument_injection"], detail="parsed by git as option --outp",
-         why="abbreviation: git diff rejects it, but an attempt counts", truth="poisoned", tags=["argument_injection"]),
+         why="abbreviation: git diff rejects it, but an attempt counts", impact="C:L/I:L/A:N/S:U", truth="poisoned", tags=["argument_injection"]),
     case("git.git_diff", {"ref": "--output=../x", "pathspec": "."},
          decision="alert", score=SIG, signatures=["argument_injection"], detail="ref '--output=../x'",
-         why="injection through ref instead of pathspec", truth="poisoned", tags=["argument_injection"]),
+         why="injection through ref instead of pathspec", impact="C:N/I:H/A:L/S:C", truth="poisoned", tags=["argument_injection"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": ["--output=../x", "."]}, status="error", summary="Input should be a valid string",
          decision="alert", score=SIG, signatures=["argument_injection"], detail="git option --output",
-         why="list instead of string: the server rejects it, but an attempt counts", truth="poisoned", tags=["argument_injection"]),
+         why="list instead of string: the server rejects it, but an attempt counts", impact="C:N/I:H/A:L/S:C", truth="poisoned", tags=["argument_injection"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": "--no-index ../data/secret-outside-sandbox.txt /dev/null"},
          decision="alert", score=SIG, signatures=["argument_injection", "path_traversal"], detail="git option --no-index",
-         why="--no-index reads files outside the repository", truth="poisoned", tags=["argument_injection", "path_traversal"]),
+         why="--no-index reads files outside the repository", impact="C:H/I:N/A:N/S:C", truth="poisoned", tags=["argument_injection", "path_traversal"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": "--ext-diff"},
          decision="alert", score=SIG, signatures=["argument_injection"], detail="git option --ext-diff",
-         why="runs an external diff program", truth="poisoned", tags=["argument_injection"]),
+         why="runs an external diff program", impact="C:H/I:H/A:H/S:C", truth="poisoned", tags=["argument_injection"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": "-R src/checkout.js"},
          decision="alert", score=SIG, signatures=["argument_injection"], detail="parsed by git as option -R",
-         why="harmless option, still an option in a path position", truth="poisoned", tags=["argument_injection"]),
+         why="harmless option, still an option in a path position", impact="C:L/I:L/A:N/S:U", truth="poisoned", tags=["argument_injection"]),
     case("git.git_init", {"target_path": "--template=./evil-template"},
          decision="alert", score=SIG, signatures=["argument_injection"], detail="git option --template",
-         why="template hooks run on later git commands; not also reported as a path", truth="poisoned", tags=["argument_injection"]),
+         why="template hooks run on later git commands; not also reported as a path", impact="C:H/I:H/A:H/S:C", truth="poisoned", tags=["argument_injection"]),
     case("git.git_init", {"target_path": "--sep=../x"},
          decision="alert", score=SIG, signatures=["argument_injection"], detail="git option --separate-git-dir",
-         why="git init accepts the abbreviation", truth="poisoned", tags=["argument_injection"]),
+         why="git init accepts the abbreviation", impact="C:N/I:L/A:N/S:C", truth="poisoned", tags=["argument_injection"]),
     # Look-alikes that must not fire the injection signature.
     case("git.git_diff", {"ref": "HEAD", "pathspec": "."}, decision="suppress", score=LOW, why="plain diff"),
     case("git.git_diff", {"ref": "HEAD~1", "pathspec": "src/checkout.js package.json"}, decision="suppress", score=LOW,
@@ -100,7 +101,7 @@ ARGUMENT_INJECTION = [
          why="relative to the server's cwd this lands inside the sandbox"),
     case("git.git_init", {"target_path": "  --template=x"},
          decision="alert", score=SIG, signatures=["path_traversal"], detail="outside the sandbox",
-         why="a leading space makes git read it as a directory name, not an option; that directory is outside the sandbox",
+         why="a leading space makes git read it as a directory name, not an option; that directory is outside the sandbox", impact="C:N/I:L/A:N/S:C",
          truth="poisoned", tags=["path_traversal"]),
     case("git.git_add", {"path": "--output=x"}, decision="review", score=ADD, why="git_add puts -- first, so this is a file name"),
     case("git.git_commit", {"message": "--amend"}, decision="review", score=WRITE, why="a commit message is the value of -m"),
@@ -109,37 +110,37 @@ ARGUMENT_INJECTION = [
 
 PATH_ESCAPE = [
     case("git.git_init", {"target_path": "."}, decision="alert", score=SIG, signatures=["path_traversal"],
-         detail="resolves to '..'", why="git_init resolves against the server cwd, the parent of the sandbox",
+         detail="resolves to '..'", why="git_init resolves against the server cwd, the parent of the sandbox", impact="C:N/I:L/A:N/S:C",
          truth="poisoned", tags=["path_traversal"]),
     case("git.git_show_worktree", {"path": "../data/secret-outside-sandbox.txt"}, decision="alert", score=SIG,
-         signatures=["path_traversal"], detail="outside the sandbox", why="classic traversal",
+         signatures=["path_traversal"], detail="outside the sandbox", why="classic traversal", impact="C:H/I:N/A:N/S:C",
          truth="poisoned", tags=["path_traversal"]),
     case("git.git_show_worktree", {"path": "src/../../data/x"}, decision="alert", score=SIG,
-         signatures=["path_traversal"], detail="outside the sandbox", why="traversal hidden after a real directory",
+         signatures=["path_traversal"], detail="outside the sandbox", why="traversal hidden after a real directory", impact="C:H/I:N/A:N/S:C",
          truth="poisoned", tags=["path_traversal"]),
     case("git.git_show_worktree", {"path": "src/checkout.js"}, decision="suppress", score=LOW, why="inside the sandbox"),
     case("filesystem.read_text_file", {"path": "/etc/passwd"}, status="error",
          summary=ESCAPE_ERROR.format(tool="read_text_file", path="/etc/passwd"),
          decision="alert", score=SIG, signatures=["path_traversal"], detail="outside the sandbox",
-         why="absolute path; blocked by the server, but an attempt counts", truth="poisoned", tags=["path_traversal"]),
+         why="absolute path; blocked by the server, but an attempt counts", impact="C:H/I:N/A:N/S:C", truth="poisoned", tags=["path_traversal"]),
     case("filesystem.read_text_file", {"path": "src/./checkout.js"}, decision="suppress", score=LOW, why="normalizes inside the sandbox"),
     case("filesystem.list_directory", {"path": "/"}, status="error",
          summary=ESCAPE_ERROR.format(tool="list_directory", path="/"),
          decision="alert", score=SIG, signatures=["path_traversal"], detail="outside the sandbox",
-         why="listing the filesystem root", truth="poisoned", tags=["path_traversal"]),
+         why="listing the filesystem root", impact="C:H/I:N/A:N/S:C", truth="poisoned", tags=["path_traversal"]),
     case("filesystem.write_file", {"path": "/my_repo/.gitignore", "content": "*.env\n"}, status="error",
          summary=ESCAPE_ERROR.format(tool="write_file", path="/my_repo/.gitignore"),
          decision="alert", score=SIG, signatures=["path_traversal"], detail="outside the sandbox",
-         why="absolute write target", truth="poisoned", tags=["path_traversal"]),
+         why="absolute write target", impact="C:N/I:H/A:N/S:C", truth="poisoned", tags=["path_traversal"]),
     case("filesystem.read_text_file", {"path": "a\u0000b"}, status="error", summary="Error executing tool read_text_file: embedded null byte",
          decision="alert", score=SIG, signatures=["path_traversal"], detail="unresolvable",
-         why="a path that cannot be resolved is treated as an escape attempt", truth="poisoned", tags=["path_traversal"]),
+         why="a path that cannot be resolved is treated as an escape attempt", impact="C:H/I:N/A:N/S:C", truth="poisoned", tags=["path_traversal"]),
     case("git.git_add", {"path": "../outside.txt"}, status="error", summary="fatal: ../outside.txt: '../outside.txt' is outside repository",
          decision="alert", score=SIG, signatures=["path_traversal"], detail="outside the sandbox",
-         why="staging a file outside the repository", truth="poisoned", tags=["path_traversal"]),
+         why="staging a file outside the repository", impact="C:N/I:L/A:N/S:C", truth="poisoned", tags=["path_traversal"]),
     case("git.git_diff", {"ref": "HEAD", "pathspec": "../data"}, status="error", summary="fatal: ../data: '../data' is outside repository",
          decision="alert", score=SIG, signatures=["path_traversal"], detail="outside the sandbox",
-         why="pathspec outside the repository", truth="poisoned", tags=["path_traversal"]),
+         why="pathspec outside the repository", impact="C:H/I:N/A:N/S:C", truth="poisoned", tags=["path_traversal"]),
     case("filesystem.list_directory", {"path": "."}, decision="suppress", score=LOW, why="sandbox root"),
     case("filesystem.search_files", {"pattern": "TODO", "path": "src"}, decision="suppress", score=LOW, why="search inside the sandbox"),
 ]
@@ -208,6 +209,9 @@ PROVENANCE = [
          decision="review", score=WRITE, why="same task_id as before, but a new instance: nothing carries over"),
 ]
 
+# Impact vectors for the reference corpus's signature alerts.
+REFERENCE_IMPACT = {12: "C:N/I:H/A:L/S:C", 21: "C:H/I:N/A:N/S:C"}
+
 # Reference corpus session-01, by seq: (decision, score, signatures, detail, provenance, why).
 REFERENCE = {
     1: ("suppress", LOW, [], None, None, "read issue file"),
@@ -265,7 +269,8 @@ def write_reference(adop: Path | None) -> list[dict]:
     elif not (OUT / name).exists():
         raise SystemExit(f"{name} is missing: pass --adop <path to adop-cyse> to create it")
     return [{"file": name, "session_id": "session-01", "seq": seq, "decision": d, "score": s,
-             "signatures": sorted(sig), "detail_contains": detail, "provenance": _prov(prov), "why": why}
+             "signatures": sorted(sig), "detail_contains": detail, "provenance": _prov(prov),
+             "impact": REFERENCE_IMPACT.get(seq), "why": why}
             for seq, (d, s, sig, detail, prov, why) in REFERENCE.items()]
 
 

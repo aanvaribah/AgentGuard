@@ -15,6 +15,7 @@ import ollama
 from agent_guard.agent.agent import DEFAULT_MODEL, AgentSession, AnalystError, Decision
 from agent_guard.agent.history import HistoryStore
 from agent_guard.models import AgentView, Confidences, LogLine
+from agent_guard.ranking import analyst_impact
 from agent_guard.reporting import reporter
 
 MODEL_ERRORS = (AnalystError, ollama.ResponseError, ConnectionError, httpx.TransportError)
@@ -68,14 +69,16 @@ class SessionRegistry:
             return
         if verdict.alert:
             reporter.call(log, "alert", score, source="analyst", label=verdict.category,
-                          evidence=verdict.evidence_seqs, reasoning=verdict.reasoning)
+                          evidence=verdict.evidence_seqs, reasoning=verdict.reasoning,
+                          impact=analyst_impact(log, verdict.category))
         else:
             reporter.call(log, "cleared", score, source="analyst", reasoning=verdict.reasoning)
 
     @staticmethod
     def _unjudged(log: LogLine, decision: Decision, score: float, why: str) -> None:
         if decision == "review":
-            reporter.call(log, "error", score, source="analyst", reasoning=why)
+            reporter.call(log, "error", score, source="analyst", reasoning=why,
+                          impact=analyst_impact(log, None))
         else:
             reporter.warning(f"seq {log.seq} of {log.session_id} not recorded in history: {why}")
 

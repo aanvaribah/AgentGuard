@@ -54,6 +54,12 @@ ALERT_THRESH = 0.8   # alert when the overall score is ABOVE this
 REVIEW_THRESH = 0.1  # send to the analyst when the score is at least this
 
 
+def injected_option(fline: LogLine) -> str | None:
+    """Canonical name of the injected option if it is a known one, else None."""
+    found = _find_option(fline)
+    return _known_option(fline.tool_name, found[1]) if found else None
+
+
 @dataclass(frozen=True)
 class Assessment:
     decision: Route
@@ -101,13 +107,31 @@ def _argv_entries(value: Any, how: str) -> list[str]:
     return items
 
 
-def _describe_option(tool_name: str, token: str) -> str:
+def _known_option(tool_name: str, token: str) -> str | None:
     name = token.split("=", 1)[0]
-    for known, effect in KNOWN_OPTIONS.get(tool_name, {}).items():
+    for known in KNOWN_OPTIONS.get(tool_name, {}):
         # git init accepts unambiguous abbreviations (--sep); git diff does not (--outp).
         if name == known or (tool_name in ABBREVIATES and len(name) >= 3 and known.startswith(name)):
-            return f"is git option {known}, which {effect}"
-    return f"is parsed by git as option {name}"
+            return known
+    return None
+
+
+def _describe_option(tool_name: str, token: str) -> str:
+    known = _known_option(tool_name, token)
+    if known:
+        return f"is git option {known}, which {KNOWN_OPTIONS[tool_name][known]}"
+    return f"is parsed by git as option {token.split('=', 1)[0]}"
+
+
+def _find_option(fline: LogLine) -> tuple[str, str] | None:
+    """The first (argument, token) that git would parse as an option, if any."""
+    for arg, how, default in OPTION_POSITIONS.get((fline.server, fline.tool_name), ()):
+        for tok in _argv_entries(fline.arguments.get(arg, default), how):
+            if tok == "--":
+                return None  # git stops parsing options here; everything after is a path
+            if tok.startswith("-"):
+                return arg, tok
+    return None
 
 
 #
@@ -137,14 +161,8 @@ def argument_injection(fline: LogLine) -> tuple[float, str | None]:
     """Signature for the argument-injection half of CVE-2025-68144, generalized: any
     agent-supplied argv entry that starts with "-" in a position git parses as an
     option (before a "--") is an injection attempt, whatever the option is."""
-    positions = OPTION_POSITIONS.get((fline.server, fline.tool_name))
-    if not positions:
+    found = _find_option(fline)
+    if found is None:
         return 0.0, None
-
-    for arg, how, default in positions:
-        for tok in _argv_entries(fline.arguments.get(arg, default), how):
-            if tok == "--":
-                return 0.0, None  # git stops parsing options here; everything after is a path
-            if tok.startswith("-"):
-                return 1.0, f"{arg} {tok!r} {_describe_option(fline.tool_name, tok)}"
-    return 0.0, None
+    arg, tok = found
+    return 1.0, f"{arg} {tok!r} {_describe_option(fline.tool_name, tok)}"
