@@ -1,6 +1,6 @@
 """
 This is where the magic happens. Signature-based results
-get dispatched to agents, which then further evaluate based on
+get dispatched to agent, which then further evaluate based on
 other evidence. Scoring itself lives in detect/scoring.py.
 """
 

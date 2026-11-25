@@ -1,19 +1,7 @@
 """
-Alert ranking by impact: the CVSS v3.1 Impact subscore of what each alerting call did,
-or attempted (an attempt counts the same as a success).
-
-The Confidentiality, Integrity and Availability ratings and the Scope come from fixed
-tables, never from the LLM: signature alerts are rated by what the call reached
-(outside the sandbox, or an injected git option), analyst alerts by the tool's action
-class raised by the category's default rating. Scope is Changed when the action
-reaches beyond the authority of the tool that was called: outside the sandbox, code
-that runs later, or memory that later sessions trust.
-
-This is the CVSS Impact subscore applied to an observed action, not a full CVSS rating:
-exploitability is not scored, since the call already happened. Scores are compared
-unrounded and shown to one decimal, as NVD shows Impact subscores.
-
-Incidents take the highest impact of any of their alerts; see triage/incidents.py.
+Alert ranking. We go by impact (CVSS 3.1 impact subscore) of what the alerting call
+either did or attempted to do. Incidents take the highest impact of any of their 
+alerts (see triage/incidents.py).
 """
 
 from dataclasses import dataclass
@@ -135,9 +123,3 @@ def analyst_impact(log: LogLine, category: str | None) -> Impact:
     """For analyst alerts, and for calls the analyst failed to judge (category None)."""
     base = BASE[action_class(log.server, log.tool_name)]
     return combine(base, CATEGORY[category]) if category in CATEGORY else base
-
-
-def rank_key(impact: float | None, alerts: int, first_seen: str, root: int) -> tuple:
-    """Incident sort key, highest priority first: chain impact, then number of alerts,
-    then the earliest root (by time, then seq)."""
-    return (-(impact or 0.0), -alerts, first_seen, root)

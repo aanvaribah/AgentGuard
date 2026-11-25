@@ -1,9 +1,9 @@
 """
-Deterministic scoring: tool-risk priors and signatures combine into one score, and
-the score decides where a call goes.
+Deterministic scoring. Take prior signatures and combine into a single score. This
+score determines where the call goes.
 
-Everything here is a pure function of a log record and the sandbox layout, with no
-I/O, threads or model calls, so it can be unit tested against static fixtures.
+All functions here take a log record and the sandbox layout without I/O or model
+calls, so everything is deterministic. This enables unit testing.
 """
 
 from dataclasses import dataclass, fields
@@ -39,7 +39,7 @@ class Confidences:
         return 1 - product
 
     def signatures(self) -> list[str]:
-        """Names of the signature checks (required for the clanker)"""
+        """Names of the signature checks"""
         return [f.name for f in fields(self) if f.name != "tool_risk" and getattr(self, f.name) >= 0.5]
 
 

@@ -1,6 +1,5 @@
 """
-Plain output: one line per event, then the ranked incidents on exit. Used when
-stdout is not a terminal, or with --plain.
+Plain output.
 """
 
 from agent_guard.core.events import Event, Snapshot

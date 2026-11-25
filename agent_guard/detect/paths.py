@@ -1,18 +1,11 @@
 """
-Path resolution logic because the ADOP system is [well designed]
-and makes me want to [skip in a field of daffodils] while I 
-[say hello] to a family of five right before [saying lots of 
-complements to] myself.
-
+Path resolution logic because the ADOP system is kind of annoying.
 So git_server runs the git_init call with cwd=".", which is the CWD of
 the MCP server process rather than PROJECT_ROOT. Every other tool uses
 PROJECT_ROOT, including ones that exist inside git_server (such as 
 git_commit). This means we need to have a clear distinction of the resolved
-path and the written path, because otherwise the STUPID ANALYSIS AGENT 
-doesn't understand that `git init .` is path traversal and `git commit .`
-is safe. 
-
-"HATE? HATE? LET ME TELL YOU HOW MUCH I'VE COME TO HATE ..." and whatnot
+path and the written path, because otherwise the analyst agent doesn't
+understand that `git init .` is path traversal and `git commit .` is safe. 
 """
 
 import json

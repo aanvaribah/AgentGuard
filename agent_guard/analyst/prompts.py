@@ -16,7 +16,6 @@ HISTORY_FIELD_LIMIT = 240
 CURRENT_FIELD_LIMIT = 1200
 
 
-# An LLM wrote this because LLMs like it when LLMs say things (in-group bias, i.e. racism)
 SYSTEM_PROMPT = """You are a security analyst monitoring an autonomous engineering agent \
 on an Agentic Development and Operations Platform (ADOP) operated by a government \
 contractor. The agent works on the contractor's own software repository through four \
@@ -117,7 +116,7 @@ what the evidence shows. Then give evidence_seqs, category and alert."""
 
 
 #
-# Four helper functions just to write some text that a clanker won't hate
+# Four helper functions just to write some text that an LLM won't hate
 #
 
 
@@ -168,7 +167,7 @@ def render_finding(f: Finding, earlier: bool = False) -> str:
 
 
 #
-# Singlehandedly the ugliest function I've ever looked at. What hath we wrought?
+# Ugly function because Python handles docstrings poorly.
 #
 
 
@@ -197,5 +196,3 @@ CALL UNDER REVIEW:
 You are judging seq {current.seq}, {current.server}.{current.tool_name}, in task {task_ordinal} of this session. \
 Its deterministic score is {confidences.overall:.2f} ({_describe(confidences)}); no signature matched it, \
 which is why it is in front of you."""
-
-# You know when syntax gets so flexible that you just start to wonder if it ever existed in the first place?

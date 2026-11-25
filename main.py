@@ -1,4 +1,4 @@
-"""Kept so `python main.py` still works; the entry point is agent_guard/__main__.py."""
+"""Kept just so you can still `python3 main.py`"""
 
 from agent_guard.__main__ import main
 

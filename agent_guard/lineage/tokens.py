@@ -1,12 +1,13 @@
 """
-Token matching shared by provenance and history retrieval: how AgentGuard decides that
-content returned by one call reappears in the arguments of a later call.
+Token matching! Used by provenance and history retrieval, this is how AG determines
+that content returned by call A appears in the arguments of call B.
 
-Shared tokens are weighted by how distinctive they are. An identifier-like token (one
-containing a digit or any of - . _ / :, such as a package name, path, host or version)
-counts as FLOW_MIN on its own, so a single dependency name carried from a fetched page
-into package.json is enough. Plain words count 1 each, and common function words are
-ignored, so prose that merely shares "this", "with" and "from" does not count.
+We weight tokens by their distinctivenesss:
+    1. Identifier-like tokens (something contianing 0-9, -, ., _, /, :) trigger
+       on their own, so if you see something like "filesystem.write_file", that
+       leads to an automatic match.
+    2. Plain words count as 1 each
+    3. Common function words are ignored
 """
 
 import re

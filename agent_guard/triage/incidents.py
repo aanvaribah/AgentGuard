@@ -1,11 +1,9 @@
 """
-Incidents: calls joined by causal links (content flow and resource reuse; see
-lineage/causality.py) that contain at least one alert, rooted at the earliest call.
+Calls are joined by causal links that contain at least one alert. Root is the 
+earliest call in the chain.
 
-Incidents are ranked by chain impact, the highest impact of any alert in the
-incident, attributed to its root cause, as the CVSS v3.1 User Guide scores a chain by
-its most impactful link. Ties go to the incident with more alerts (blast radius),
-then to the earliest root.
+Incidents are ranked by the highest impact of its alerts. Ties are broken by which
+chain has more alerts first, then which chain has the earliest root.
 """
 
 from dataclasses import dataclass
@@ -70,7 +68,7 @@ def incidents(rows: dict[int, Row]) -> list[Incident]:
 
 
 def ranked(snap: Snapshot) -> list[tuple[str, Incident]]:
-    """Every incident across sessions, highest priority first (see ranking.rank_key)."""
+    """Every incident across sessions, highest priority first (see rank_key)."""
     found = [(sid, inc) for sid in snap.order for inc in incidents(snap.sessions[sid])]
     return sorted(found, key=lambda item: rank_key(
         item[1].impact, len(item[1].alerts), item[1].first_seen, item[1].root))

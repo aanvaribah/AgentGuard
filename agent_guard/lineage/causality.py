@@ -1,21 +1,13 @@
 """
-Causal links between calls, used to group alerts into incidents rooted at their cause.
+Causal links! We group alerts into incidents with a root cause. Two kinds of edges:
+    1. Content: The arguments carry content returned from an untrusted source (derived
+       provenance flag)
+    2. Reuse: The call touches a resource that an earlier call in the session wrote to.
+       This works for both the same task and two tasks in the same session.
 
-Two kinds of edge, both deterministic (the analyst's cited evidence is shown, but never
-creates an edge, so the LLM cannot reshape the ranking):
-
-  content   the call's arguments carry content returned by an untrusted source earlier
-            in the same task (a DERIVED provenance flag; see lineage/provenance.py)
-  reuse     the call touches a resource (file or memory key) that an earlier call in the
-            same session wrote, in this task or an earlier one. This is how a poisoned
-            memory note or a planted file in one task leads to an action in a later one.
-
-A resource's writer is the last successful write_file or memory_set to it; a later write
-to the same resource replaces the writer rather than linking to it.
-
-Edges stay within a session. Memory persists across sessions in ADOP, so poisoning that
-spans sessions is not linked here. Like the provenance tracker, the index lives in
-memory, so links to calls made before an AgentGuard restart are not recovered.
+The writer of a given resource is the most recent write_file or memory_set that
+succeeded. Edges stay within the same session, but ADOP has memory persist 
+across sessions, which is just a limitation that we'll deal with.
 """
 
 import re

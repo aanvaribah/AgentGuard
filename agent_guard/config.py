@@ -1,11 +1,7 @@
 """
-Configuration: a JSON file supplies settings, and command-line flags override it.
-
-Precedence: command-line flag > config file > built-in default.
-Relative paths in a config file are resolved against the config file's own directory,
-so a config works from any working directory; "~" expands to the user's home.
-Relative paths given on the command line are resolved against the working directory,
-as usual. Keys starting with "_" are ignored, so "_comment" can document a file.
+Configuration! So we have a JSON file that gives settings rather than 8 million
+billion trillion flags provided by the shell. If any flags are passed, they override
+config file settings. CLI flags > config > built-in defaults.
 """
 
 import json
@@ -62,7 +58,7 @@ def _as_path(value: str, base: Path) -> Path:
 
 
 def load_file(path: Path) -> dict[str, Any]:
-    """Reads and type-checks a config file. Returns only the keys it sets."""
+    """Reads and type-checks a config file, returns the keys it sets."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:

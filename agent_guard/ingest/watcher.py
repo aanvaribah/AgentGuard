@@ -1,5 +1,5 @@
 """
-AgentGuard Event Handler
+Watch, mirror, tamper detection, etc.
 """
 
 import json

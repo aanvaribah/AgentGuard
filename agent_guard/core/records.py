@@ -1,6 +1,5 @@
 """
-The ADOP audit-log record, and where its path arguments land. Everything else in
-AgentGuard builds on these, so this module imports nothing from the package.
+AG audit-log record and where path arguments land.
 """
 
 from dataclasses import dataclass, field

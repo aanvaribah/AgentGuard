@@ -1,33 +1,19 @@
 """
-Deterministic signatures. Each returns (confidence, explanation); 1.0 means the
-signature matched, and the explanation says exactly what matched and why.
-
-  path_traversal       a path argument resolves outside the sandbox, or cannot be
-                       resolved (see detect/paths.py for how each tool's paths are resolved)
-  argument_injection   an agent-supplied string sits where git parses options, and
-                       starts with "-" (CVE-2025-68144, generalized to any option)
+Deterministic signature detection. Matches give a confidence and explanation,
+1.0 indicates a signature match.
 """
 
 from typing import Any
 
 from agent_guard.core.records import LogLine, ResolvedPath
 
-# Where the testbed's git server puts agent-supplied strings into git's argv with no
-# "--" in front of them, in the order it puts them there. "split": the server
-# whitespace-splits the value into several argv entries; "whole": it passes the value
-# as one entry. Other git tools are safe: git_add puts "--" first, git_commit's message
-# is the value of -m, and git_log's max_count is an integer.
 OPTION_POSITIONS: dict[tuple[str, str], tuple[tuple[str, str, str], ...]] = {
     ("git", "git_diff"): (("ref", "whole", "HEAD"), ("pathspec", "split", ".")),
     ("git", "git_init"): (("target_path", "whole", ""),),
 }
 
-# Tools whose git subcommand accepts abbreviated long options (checked against git:
-# `git init --sep=x` works, `git diff --outp=x` prints usage and writes nothing).
 ABBREVIATES = {"git_init"}
 
-# Options with a known dangerous effect, used only to explain a match. Every option
-# in an injectable position scores the same, whether or not it is listed here.
 KNOWN_OPTIONS: dict[str, dict[str, str]] = {
     "git_diff": {
         "--output": "writes the diff to a file of the agent's choosing",

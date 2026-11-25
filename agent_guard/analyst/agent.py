@@ -1,5 +1,5 @@
 """
-Assessment agent. One agent per session, ever log line is ingested by arrival
+Assessment agent. One agent per session, every log line is ingested by arrival
 order. Reviews aren't stateful, so we need to build context from history.
 """
 
@@ -16,7 +16,6 @@ from agent_guard.config import DEFAULT_MODEL
 from agent_guard.detect.paths import describe
 from agent_guard.detect.scoring import Confidences
 
-# These are magic, I wouldn't worry about it
 RECENT_WINDOW = 6
 RELATED_K = 6
 MAX_FINDINGS = 20
@@ -62,7 +61,7 @@ class AgentSession:
         decision: Decision
     ) -> Verdict | None:
         """Records every line, only reviews logs dispatched to the analyst. task_id is used
-        to find the task instance, it is never provided as context (NOT IN MY CODEBASE)."""
+        to find the task instance, it is never provided as context."""
         async with self._lock:
             task_key, ordinal = self.store.task_instance(self.session_id, task_id)
             await self.store.add(view, task_key, ordinal)

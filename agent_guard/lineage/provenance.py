@@ -1,23 +1,14 @@
 """
-Provenance flag: whether a mutating call carries content that came from an untrusted
-source earlier in the same task instance.
+Provenance flags (as requested). Essentially, we just want to see if a mutating call
+has content from an untrusted source earlier in the task. An untrusted source is any
+call that returns content the agent didn't write (fetch, memory_get). Mutating calls
+(anything outside the set of read-only tools) get:
+    1. DERIVED: Arguments share distinctive content with the an untrusted source.
+    2. CONTEXT: An untrusted source was read earlier, but no content in the arguments.
+    3. None: No untrusted source earlier in the task (or the call is read-only)
 
-Untrusted sources are calls that return content the agent did not write and the operator
-did not vet: fetch (external pages) and memory_get (notes an earlier session may have
-poisoned). A mutating call (anything outside the read-only tool set, unknown tools
-included) gets:
-
-  DERIVED  its arguments share distinctive content (tokens.flowed) with the result of
-           an untrusted source in this task: the action carries that content forward.
-  CONTEXT  an untrusted source was read earlier in this task, but none of its content
-           appears in the arguments.
-  None     no untrusted source earlier in this task, or the call is read-only.
-
-The flag records where content came from, not whether the call is malicious: a summary
-of a fetched page is DERIVED by design. It feeds ranking and the analyst's context.
-
-Results are only the first 200 characters of each tool output (the ADOP log keeps no
-more), so content from later in a long page cannot be traced.
+Results are only the first 200 characters of each tool output (ADOP's constraint,
+not ours).
 """
 
 from dataclasses import dataclass, field

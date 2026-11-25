@@ -1,6 +1,5 @@
 """
-Text helpers shared by the views. Log fields are attacker-influenced, so everything
-from a log goes through clean() before it reaches a terminal.
+Text helpers to help format things for the agent.
 """
 
 from agent_guard.core.events import Event, Row

@@ -1,6 +1,6 @@
 """
-Tool-risk priors: how risky a call is from its tool alone, before any signature.
-Unknown tools fail closed with the same prior as a mutating tool.
+How risky a call is just based on what the tool is capable of. Unknown tools
+are treated as high risk (fail closed).
 """
 
 TOOL_RISK: dict[tuple[str, str], float] = {

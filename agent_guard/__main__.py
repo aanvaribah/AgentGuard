@@ -94,8 +94,7 @@ def main() -> None:
         try:
             while observer.is_alive():
                 time.sleep(1)
-            # I am HILARIOUS put me on marketing stat
-            reporter.critical("File observer stopped. No longer AgentGuarding.")
+            reporter.critical("File observer stopped. No longer guarding.")
         except KeyboardInterrupt:
             pass
         finally:

@@ -1,6 +1,7 @@
 """
-What the analyst is shown: a log record without ground truth (scenario_tag,
-annotations) or task_id, and the findings it may cite.
+Here we define what the analyst agent gets to see. Essentially, we just 
+strip the log of scenario_tag and annotations as well as task_id. This
+prevents data leakage.
 """
 
 from dataclasses import dataclass

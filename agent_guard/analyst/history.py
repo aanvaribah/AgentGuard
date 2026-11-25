@@ -5,8 +5,7 @@ Every log line is stored as AgentView (no scenario_tag or annotations). Findings
 that are established through signatures or the analyst are shown as well. Retrieval
 starts with shared resources and content from earlier results, and then goes to 
 semantic matching. Only signatured findings get kept to prevent feedback loops
-in the analyst agent. The DB lives in the root of the mirror director (I love
-SQLite I love SQLite I love SQLite ...)
+in the analyst agent. The DB lives in the root of the mirror directory.
 """
 
 import hashlib
@@ -28,7 +27,6 @@ from agent_guard.lineage.causality import resource_keys
 from agent_guard.lineage.tokens import FLOW_MIN, strings, tokens, weight
 from agent_guard.report.reporter import reporter
 
-# Literally just magic values (shut up about it)
 EMBED_MODEL = "nomic-embed-text"
 # For when we get a tool instead of a resource ("server:tool" fallback)
 MIN_SCORE = 1.0  # relevance floor
@@ -137,9 +135,8 @@ class HistoryStore:
     def task_instance(self, session_id: str, task_id: str) -> tuple[str, int]:
         """Opaque key and ordinal for the task instance this call belongs to.
         Essentially, tracking tasks and sessions is a nightmare so we need to
-        make a bunch of ridiculous hashes rather than referencing things by what
-        already ought to be a unique name. Nightmare nightmare nightmare
-        nightmare nightmare ..."""
+        make a bunch of hashes rather than referencing things by what already 
+        ought to be a unique name."""
         current = _digest("task", session_id, task_id)
         row = self._db.execute(
             "SELECT last_task, ordinal FROM sessions WHERE session_id = ?", (session_id,)

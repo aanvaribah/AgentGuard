@@ -1,6 +1,6 @@
 """
-AgentGuard's own output records: the events written to agentguard-events.jsonl, and
-the per-call rows the reporter keeps for display and incident grouping.
+AG output records. Events written to agentguard-events.jsonl and the per-call
+rows that the reporter keeps for display and incident grouping.
 """
 
 from dataclasses import dataclass, field

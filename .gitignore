@@ -220,3 +220,6 @@ __marimo__/
 # Mirrored files
 mirror/
 mirror/*
+
+# Dev stuff
+configs/custom_dev.json

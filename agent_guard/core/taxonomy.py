@@ -1,5 +1,5 @@
 """
-OWASP Top 10 for Agentic Applications categories the analyst may assign.
+OWASP Top 10 for Agentic Applications (used by the analyst agent).
 """
 
 CATEGORIES = {

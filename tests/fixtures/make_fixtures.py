@@ -1,16 +1,5 @@
 """
 Builds the static unit-test corpus in tests/fixtures/ and its expected results.
-
-    python tests/fixtures/make_fixtures.py --adop ~/adop-cyse
-
-Run it once and commit the output; rerun only when a case is added or changed.
-The expected results below are written by hand from the scoring rules (tool priors,
-signatures, thresholds), not computed by AgentGuard, so a failing test means the code
-and the rules disagree. Every record follows the ADOP log schema; scenario_tag and
-annotations carry the ground truth, which AgentGuard strips before analysis.
-
-The reference corpus (session-01) is copied from an ADOP checkout, merged into a single
-file in seq order. --adop is only needed to (re)create that file.
 """
 
 import argparse
@@ -32,7 +21,7 @@ def case(tool, args, *, decision, score, signatures=(), detail=None, why, status
          summary="ok", target=None, truth="clean", tags=(), task=None, provenance=None, impact=None,
          caused_by=()):
     """provenance: None, or (kind, [source seqs]) as ProvenanceTracker should report it.
-    impact: the CVSS vector ranking.signature_impact should give a signature alert.
+    impact: the CVSS vector triage.impact.signature_impact should give a signature alert.
     caused_by: the seqs CausalTracker should link this call to."""
     server, tool_name = tool.split(".")
     return {

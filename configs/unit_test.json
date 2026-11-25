@@ -1,5 +1,5 @@
 {
-  "_comment": "Static run over the frozen unit-test corpus. mirror_root is null, so every run gets a fresh temporary mirror and replays every record instead of skipping those an earlier run already mirrored.",
+  "_comment": "Static run over the frozen unit-test corpus.",
   "corpus": "../tests/fixtures",
   "agent_root": "../tests/fixtures/testbed-repo",
   "server_cwd": "../tests/fixtures",
