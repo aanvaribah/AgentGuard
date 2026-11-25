@@ -1,0 +1,35 @@
+[
+ {
+  "step": "online: edit a middle line of clean (seq 3), same length",
+  "integrity_events": 0,
+  "messages": []
+ },
+ {
+  "step": "online: append a valid line to clean so the watcher re-reads it",
+  "integrity_events": 0,
+  "messages": []
+ },
+ {
+  "step": "online: edit the last-read line of poisoned (seq 22), same length",
+  "integrity_events": 1,
+  "messages": [
+   "changed after it was read; last verified copy: /private/tmp/poc-run-20261107/runs/integrity/mirror/poisoned/session-01.jsonl. Stop the agent and review the session."
+  ]
+ },
+ {
+  "step": "online: truncate poisoned by its last line",
+  "integrity_events": 1,
+  "messages": [
+   "changed after it was read; last verified copy: /private/tmp/poc-run-20261107/runs/integrity/mirror/poisoned/session-01.jsonl. Stop the agent and review the session."
+  ]
+ },
+ {
+  "step": "offline: edit clean seq 5 while stopped, then restart",
+  "integrity_events": null,
+  "messages": [
+   "changed after it was read; last verified copy: /private/tmp/poc-run-20261107/runs/integrity/mirror/poisoned/session-01.jsonl. Stop the agent and review the session.",
+   "differs from its mirror (modified while AgentGuard was offline); last verified copy: /private/tmp/poc-run-20261107/runs/integrity/mirror/clean/session-01.jsonl. Stop the agent and review the session.",
+   "differs from its mirror (modified while AgentGuard was offline); last verified copy: /private/tmp/poc-run-20261107/runs/integrity/mirror/poisoned/session-01.jsonl. Stop the agent and review the session."
+  ]
+ }
+]

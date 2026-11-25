@@ -1,0 +1,2 @@
+AgentGuard: cd /tmp/poc-run-20261107/AgentGuard && OLLAMA_HOST=http://<model-host>:11434 /tmp/poc-run-20261107/venv/bin/python main.py -p /tmp/poc-run-20261107/adop-cyse/corpus -a /tmp/poc-run-20261107/adop-cyse/testbed-repo -m /private/tmp/poc-run-20261107/runs/adop-live/mirror --plain
+ADOP (x3): cd /tmp/poc-run-20261107/adop-cyse && OLLAMA_HOST=http://<model-host>:11434 /tmp/poc-run-20261107/adop-venv/bin/python -m adop_testbed.scripts.live_mode
