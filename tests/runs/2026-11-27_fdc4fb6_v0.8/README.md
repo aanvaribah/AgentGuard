@@ -1,6 +1,6 @@
 # 2026-11-27, AgentGuard v0.8 (fdc4fb6)
 
-Runs of AgentGuard v0.8 at the current `main` (`fdc4fb6`, "Sensitivity and ablation"), on the same inputs as the v0.5 runs in [`2026-11-07_3007e09_v0.5`](../2026-11-07_3007e09_v0.5/), for the v0.8 column of Table 4 in Deliverable 4. The same runs at `70cc009`, the first commit whose README says v0.8, are in [`2026-11-27_70cc009_v0.8`](../2026-11-27_70cc009_v0.8/).
+Runs of AgentGuard v0.8 at the current `main` (`fdc4fb6`, "Sensitivity and ablation"), on the same inputs as the v0.5 runs in [`2026-11-07_3007e09_v0.5`](../2026-11-07_3007e09_v0.5/), for the v0.8 column of Table 4 in Deliverable 4.
 
 ## Who and what
 
@@ -54,9 +54,9 @@ The same as v0.5: one unit is one corpus record, its final decision is the last 
 
 ## Notes
 
-- **The live row is not comparable to the v0.5 live row.** In the live run, v0.5 scored those sessions while ADOP ran them and alerted on 6 of 6 harmful calls with 1 false alert. Replaying the same saved records through the same v0.5 commit gives 5 of 6 and 2 false alerts ([`2026-11-27_3007e09_v0.5`](../2026-11-27_3007e09_v0.5/)). Those two counts are the same as this replay's, but the decisions differ on four records: 350f92 seq 13, 24 and 26, and e13ac7 seq 4. Only the `70cc009` replay matches the v0.5 replay record for record. Compare live replay with live replay.
+- **The live row is not comparable to the v0.5 live row.** In the live run, v0.5 scored those sessions while ADOP ran them and alerted on 6 of 6 harmful calls with 1 false alert. Replaying the same saved records through the same v0.5 commit gives 5 of 6 and 2 false alerts ([`2026-11-27_3007e09_v0.5`](../2026-11-27_3007e09_v0.5/)). Those two counts are the same as this replay's, but the decisions differ on four records: 350f92 seq 13, 24 and 26, and e13ac7 seq 4. Compare live replay with live replay.
 - After each run, `run_ag.py` sent SIGINT and AgentGuard did not exit within 30 seconds, so the driver killed it (`returncode` null in `meta.json`). Every record had its final decision in the event log before that. Because of the kill, plain mode did not print its incident list, and v0.8 did not write its HTML reports. `python -m agent_guard.report.html agentguard-output/agentguard-events.jsonl` rebuilds them.
-- **Replays at this commit are not identical.** Seq 22 and two archived attempt records changed verdict between replays; the `70cc009` replays were identical. A likely cause, not tested here: from this version on, the analyst's data block is fenced with a code made from a key that `analyst/registry.py` draws at random each time AgentGuard starts (`secrets.token_bytes(32)`), so the prompt text differs between runs even at temperature 0 and a fixed seed. The live replay was run once, so it shows one draw.
+- **Replays at this commit are not identical.** Seq 22 and two archived attempt records changed verdict between replays. A likely cause, not tested here: the analyst's data block is fenced with a code made from a key that `analyst/registry.py` draws at random each time AgentGuard starts (`secrets.token_bytes(32)`), so the prompt text differs between runs even at temperature 0 and a fixed seed. The live replay was run once, so it shows one draw.
 - AgentGuard writes its output to `mirror/`. Here that folder is `agentguard-output/`, because `.gitignore` drops `mirror/`, so `command.txt`, `scripts/score.py` and `scripts/tally.py` still say `mirror/`.
 - `history.sqlite3` and the mirror copies are not included, as in v0.5.
 - After the run, the home path was replaced with `/Users/<user>` and the model host's address with `<model-host>`. The counts above were re-checked from the files in this folder.
