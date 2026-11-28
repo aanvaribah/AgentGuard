@@ -29,5 +29,6 @@ Scored with `scripts/score.py` and the v0.5 `labels.json`.
 
 ## Notes
 
+- The output folder is `agentguard-output/` rather than `mirror/`, because `.gitignore` drops `mirror/`; `command.txt` and `scripts/score.py` still say `mirror/`.
 - AgentGuard did not exit within 30 seconds of SIGINT and the driver killed it after every record had its final decision.
 - After the run, the home path was replaced with `/Users/<user>` and the model host's address with `<model-host>`.
