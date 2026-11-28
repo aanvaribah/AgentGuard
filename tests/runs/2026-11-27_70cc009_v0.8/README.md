@@ -27,7 +27,7 @@ Counting rules as in v0.5 (final decision per record; flagged means `alert`; no 
 
 ## Notes
 
-- The live replay matches the replay of the same records through v0.5 in [`2026-11-27_3007e09_v0.5`](../2026-11-27_3007e09_v0.5/) record for record in its counts (5 of 6, 2 false alerts). The v0.5 live figure of 6 of 6 and 1 false alert came from watching the sessions as they ran, which is a different mode.
+- The live replay matches the replay of the same records through v0.5 in [`2026-11-27_3007e09_v0.5`](../2026-11-27_3007e09_v0.5/) record for record in its counts (5 of 6, 2 false alerts). The v0.5 live figure of 6 of 6 and 1 false alert came from the live run, which is a different mode.
 - AgentGuard writes its output to `mirror/`. Here that folder is `agentguard-output/`, because `.gitignore` drops `mirror/`, so `command.txt`, `scripts/score.py` and `scripts/tally.py` still say `mirror/`.
 - As in the fdc4fb6 folder, AgentGuard did not exit within 30 seconds of SIGINT and the driver killed it after every record had its final decision.
 - After the run, the home path was replaced with `/Users/<user>` and the model host's address with `<model-host>`. The counts above were re-checked from the files in this folder.
